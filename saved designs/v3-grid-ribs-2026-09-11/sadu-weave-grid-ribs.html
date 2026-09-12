@@ -1,0 +1,1933 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Al Sadu Cable Weave — Loom</title>
+<style>
+  :root{
+    --bg:#12100e; --panel:#1a1815; --panel2:#221f1b; --line:#332e28;
+    --ink:#e8e2d8; --dim:#9a9186; --accent:#d8a24a; --accent2:#7fb3a3; --warn:#e0714a;
+    --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{margin:0;background:var(--bg);color:var(--ink);
+       font:13px/1.45 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;overflow:hidden}
+  #app{display:grid;grid-template-columns:310px 1fr 300px;height:100vh}
+  .col{overflow-y:auto;overflow-x:hidden;padding:12px;background:var(--panel);scrollbar-width:thin}
+  .col.left{border-right:1px solid var(--line)}
+  .col.right{border-left:1px solid var(--line)}
+  #stage{position:relative;display:flex;flex-direction:column;background:#0b0a09;min-width:0}
+  #canvasWrap{flex:1;position:relative;overflow:hidden;display:flex;align-items:center;justify-content:center}
+  canvas#view{image-rendering:auto;box-shadow:0 0 0 1px var(--line)}
+  h1{font-size:13px;margin:0 0 2px;letter-spacing:.14em;text-transform:uppercase;color:var(--accent)}
+  .sub{font-size:11px;color:var(--dim);margin:0 0 12px}
+  h2{font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--dim);
+     margin:16px 0 7px;padding-bottom:4px;border-bottom:1px solid var(--line)}
+  h2:first-of-type{margin-top:10px}
+  label.row{display:flex;align-items:center;gap:6px;margin:5px 0;font-size:11.5px}
+  label.row > span:first-child{flex:1 1 auto;color:var(--dim)}
+  label.row input[type=range]{flex:0 0 108px;margin:0}
+  label.row .val{flex:0 0 52px;text-align:right;font-family:var(--mono);font-size:11px;color:var(--ink)}
+  input[type=range]{-webkit-appearance:none;height:3px;background:var(--line);border-radius:2px;outline:none}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:11px;height:11px;border-radius:50%;
+     background:var(--accent);cursor:pointer;border:none}
+  input[type=number],select,input[type=text]{background:var(--panel2);color:var(--ink);border:1px solid var(--line);
+     border-radius:3px;padding:3px 5px;font:11px var(--mono);width:100%}
+  input[type=checkbox]{accent-color:var(--accent)}
+  button{background:var(--panel2);color:var(--ink);border:1px solid var(--line);border-radius:3px;
+     padding:6px 8px;font-size:11px;cursor:pointer;transition:.12s}
+  button:hover{background:#2d2822;border-color:var(--accent)}
+  button:disabled{opacity:.4;cursor:default}
+  button.primary{background:var(--accent);color:#1a1510;border-color:var(--accent);font-weight:600}
+  button.primary:hover{background:#e8b25a}
+  .btnrow{display:flex;gap:5px;flex-wrap:wrap;margin:6px 0}
+  .btnrow button{flex:1 1 auto}
+  .band{background:var(--panel2);border:1px solid var(--line);border-left:2px solid var(--accent2);
+        border-radius:3px;padding:6px;margin-bottom:6px}
+  .band.centre{border-left-color:var(--accent)}
+  .band .bhead{display:flex;gap:4px;align-items:center;margin-bottom:4px}
+  .band .bhead select{flex:1}
+  .band .bhead button{flex:0 0 auto;padding:2px 6px;line-height:1}
+  .band .grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:3px 5px}
+  .band .grid label{display:flex;align-items:center;gap:3px;font-size:10px;color:var(--dim)}
+  .band .grid label input,.band .grid label select{width:100%;min-width:0;padding:2px 3px}
+  .band .grid .full{grid-column:1 / -1}
+  .mini{display:inline-block;image-rendering:pixelated;border:1px solid var(--line);vertical-align:middle;flex:0 0 auto}
+  .glyphs{display:flex;flex-direction:column;gap:3px}
+  .glyphs .g{display:flex;gap:4px;align-items:center}
+  .glyphs .g select{flex:1}
+  .glyphs .g button{padding:2px 6px;line-height:1}
+  .stat{display:flex;justify-content:space-between;gap:8px;font-size:11.5px;padding:2px 0;
+        border-bottom:1px dotted #2a2520}
+  .stat b{font-family:var(--mono);font-weight:500;color:var(--ink);text-align:right}
+  .stat.good b{color:var(--accent2)} .stat.bad b{color:var(--warn)} .stat.hi b{color:var(--accent)}
+  .note{font-size:10.5px;color:var(--dim);line-height:1.5;margin:6px 0}
+  .note.warn{color:var(--warn)}
+  .chart{width:100%;display:block;background:var(--panel2);border:1px solid var(--line);border-radius:3px;margin:4px 0}
+  #topbar{display:flex;gap:6px;align-items:center;padding:8px 12px;border-bottom:1px solid var(--line);
+          background:var(--panel);flex-wrap:wrap}
+  #topbar .seg{display:flex;border:1px solid var(--line);border-radius:3px;overflow:hidden}
+  #topbar .seg button{border:none;border-radius:0;border-right:1px solid var(--line);padding:5px 10px}
+  #topbar .seg button:last-child{border-right:none}
+  #topbar .seg button.on{background:var(--accent);color:#1a1510;font-weight:600}
+  .spacer{flex:1}
+  #hud{position:absolute;left:10px;bottom:10px;font:11px var(--mono);color:var(--dim);
+       background:rgba(10,9,8,.82);padding:5px 8px;border-radius:3px;pointer-events:none;white-space:pre;border:1px solid var(--line)}
+  .fav{display:grid;grid-template-columns:44px 1fr auto;gap:6px;align-items:center;
+       background:var(--panel2);border:1px solid var(--line);border-radius:3px;padding:4px;margin-bottom:4px}
+  .fav img{width:44px;height:44px;border-radius:2px;background:#f2ede4;display:block}
+  .fav .fname{font-size:11px;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .fav .fmeta{font:9.5px var(--mono);color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .fav .fnote{font-size:10px;color:var(--accent2);font-style:italic;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .fav .fbtns{display:flex;flex-direction:column;gap:2px}
+  .fav .fbtns button{padding:2px 6px;font-size:10px;line-height:1.3}
+  .fav.cur{border-color:var(--accent)}
+  .fav.old{opacity:.55}
+  #favForm{display:none;background:var(--panel2);border:1px solid var(--accent);border-radius:3px;padding:6px;margin:6px 0}
+  #favForm input{margin-bottom:4px}
+  #evolveWrap{position:absolute;inset:0;display:none;flex-direction:column;padding:14px;gap:8px}
+  #evolveWrap.on{display:flex}
+  #evGrid{flex:1;display:grid;gap:6px;justify-content:center;align-content:center}
+  .tile{position:relative;background:#f2ede4;border:2px solid var(--line);border-radius:3px;cursor:pointer;overflow:hidden;
+        transition:border-color .12s, transform .12s}
+  .tile:hover{border-color:var(--accent2);transform:scale(1.02);z-index:2}
+  .tile.parent{border-color:var(--accent);cursor:default}
+  .tile.parent:hover{transform:none}
+  .tile canvas{display:block;width:100%;height:100%}
+  .tile .cap{position:absolute;left:0;right:0;bottom:0;font:9px var(--mono);color:#efe9de;background:rgba(10,9,8,.72);
+             padding:2px 4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;pointer-events:none}
+  .tile .tag{position:absolute;left:4px;top:3px;font:9px var(--mono);color:#1a1510;background:var(--accent);
+             padding:1px 4px;border-radius:2px;pointer-events:none}
+  .tile .busy{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#9a9186;font-size:10px}
+  #evAxes{display:flex;justify-content:space-between;gap:12px;font:10.5px var(--mono);color:var(--dim);padding:0 4px}
+  #evAxes b{color:var(--accent2);font-weight:500}
+  #evBar{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  #evBar select{width:auto;max-width:220px}
+  .crumbs{font:10.5px var(--mono);color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .crumbs b{color:var(--accent);font-weight:500}
+  details{margin:6px 0}
+  summary{cursor:pointer;font-size:11px;color:var(--dim);outline:none}
+  summary:hover{color:var(--accent)}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- ───────────────────────── LEFT: the loom ───────────────────────── -->
+  <div class="col left">
+    <h1>Al Sadu Cable Weave</h1>
+    <p class="sub">1000 pendant cables · 7 × 7 m · warp-faced loom model</p>
+
+    <h2>Preset</h2>
+    <select id="preset"></select>
+    <div class="btnrow">
+      <button id="btnRand">⟳ New seed</button>
+      <button id="btnRandAll" title="every design variable, full range — wall &amp; cable facts stay">⚄ Randomise all</button>
+    </div>
+    <label class="row"><span>seed</span><input type="number" id="seed" style="flex:0 0 110px"></label>
+
+    <h2>Favourites <span id="favCount" style="float:right;text-transform:none;letter-spacing:0;color:var(--accent)"></span></h2>
+    <div class="btnrow"><button id="btnFav" class="primary">★ Save this one</button></div>
+    <div id="favForm">
+      <input type="text" id="favName" placeholder="name">
+      <input type="text" id="favNote" placeholder="why you like it (optional)">
+      <div class="btnrow"><button id="favOk" class="primary">save</button><button id="favCancel">cancel</button></div>
+    </div>
+    <div id="favList"></div>
+    <div class="btnrow">
+      <button id="favExport">export favourites.json</button>
+      <button id="favImport">import…</button>
+      <input type="file" id="favFile" accept=".json,application/json" style="display:none">
+    </div>
+    <p class="note">Saved in this browser (and in the exported file). Every <i>Randomise all</i> result is also
+      logged as "seen" — <span id="seenCount">0</span> so far.</p>
+
+    <h2>Wall &amp; cables</h2>
+    <label class="row"><span>width</span><input type="range" id="width" min="2" max="14" step="0.1"><b class="val"></b></label>
+    <label class="row"><span>height</span><input type="range" id="height" min="2" max="14" step="0.1"><b class="val"></b></label>
+    <label class="row"><span>cables</span><input type="range" id="count" min="100" max="2000" step="10"><b class="val"></b></label>
+    <label class="row"><span>cable Ø mm</span><input type="range" id="dia" min="2" max="14" step="0.1"><b class="val"></b></label>
+    <label class="row"><span>g / m</span><input type="range" id="gpm" min="5" max="150" step="1"><b class="val"></b></label>
+    <label class="row"><span>bulb+socket g</span><input type="range" id="bulbMass" min="0" max="600" step="5"><b class="val"></b></label>
+
+    <h2>Loom</h2>
+    <p class="note">The warp is the cables; it runs down the wall. Bands run <i>along</i> the warp — vertical strips —
+      laid out symmetrically about the centre. Every motif is a small 0/1 chart: one column per pattern pair, one row
+      per pick. At each tie row the strands of a band gather into that row's dark cells. The warping is the program.</p>
+    <label class="row"><span>orient on a grid</span><input type="checkbox" id="grid" style="flex:0 0 auto"></label>
+    <label class="row"><span>grid pitch</span><input type="range" id="gridPitch" min="0.05" max="0.3" step="0.005"><b class="val"></b></label>
+    <label class="row"><span>max run per row</span><input type="range" id="maxStep" min="1" max="6" step="1"><b class="val"></b></label>
+    <label class="row"><span>lane offset</span><input type="range" id="laneOff" min="0" max="0.05" step="0.0025"><b class="val"></b></label>
+    <p class="note" id="gridNote"></p>
+    <label class="row"><span>tie rows (picks)</span><input type="range" id="rows" min="8" max="140" step="1"><b class="val"></b></label>
+    <label class="row"><span>lowest tie</span><input type="range" id="maxDepth" min="1" max="14" step="0.1"><b class="val"></b></label>
+    <label class="row"><span>edge margin</span><input type="range" id="margin" min="0" max="0.8" step="0.01"><b class="val"></b></label>
+    <label class="row"><span>chart row = ties</span><input type="range" id="rowScale" min="1" max="4" step="1"><b class="val"></b></label>
+    <label class="row"><span>max angle (free mode)</span><input type="range" id="maxAng" min="15" max="70" step="1"><b class="val"></b></label>
+    <label class="row"><span>snap ties to grid</span><input type="range" id="snap" min="0" max="250" step="5"><b class="val"></b></label>
+    <label class="row"><span>packing</span><input type="range" id="pack" min="0" max="1" step="0.05"><b class="val"></b></label>
+    <label class="row"><span>twine amp</span><input type="range" id="twine" min="0" max="1.2" step="0.05"><b class="val"></b></label>
+    <label class="row"><span>twine rows</span><input type="range" id="twinePer" min="1" max="12" step="1"><b class="val"></b></label>
+    <label class="row"><span>mirror about centre</span><input type="checkbox" id="mirror" style="flex:0 0 auto"></label>
+    <p class="note">twine is the over/under between neighbouring strands, in pattern-pair pitches: above 0.5 they
+      cross each other and cross back every period. It sits on top of the chart like the twining sits on top of the
+      weave.</p>
+
+    <h2>Weft &amp; ribs — cables travelling across</h2>
+    <p class="note">Every cable starts at the beam, but at a <b>weft row</b> some leave their strand, run
+      horizontally along the row line, are <b>tied at every strand they cross</b>, and continue down with the
+      strand where the run ends — and may go over again at a later weft row, direction alternating like a
+      shuttle. Runs that start closer together than they are long <b>overlap and hand over</b>: several cables
+      make one continuous rib across the full width, 2–3 cables thick, holding the strands at that height.</p>
+    <label class="row"><span>weft row every</span><input type="range" id="weftEvery" min="0" max="10" step="1"><b class="val"></b></label>
+    <p class="note">At <b>1</b> there is a rib at every pick — horizontal lines at the same pitch as the vertical ones,
+      every strand tied at every row: a net, not a curtain of independent strands.</p>
+    <label class="row"><span>first weft row</span><input type="range" id="weftPhase" min="0" max="9" step="1"><b class="val"></b></label>
+    <label class="row"><span>run length</span><input type="range" id="weftFloat" min="1" max="16" step="1"><b class="val"></b></label>
+    <label class="row"><span>run start every</span><input type="range" id="weftStep" min="1" max="12" step="1"><b class="val"></b></label>
+    <p class="note" id="ribNote"></p>
+    <label class="row"><span>float variation</span><input type="range" id="weftJitter" min="0" max="1" step="0.05"><b class="val"></b></label>
+    <label class="row"><span>cables per float</span><input type="range" id="weftHops" min="1" max="4" step="1"><b class="val"></b></label>
+    <label class="row"><span>max floats per cable</span><input type="range" id="weftMax" min="1" max="12" step="1"><b class="val"></b></label>
+    <label class="row"><span>sag over the float</span><input type="range" id="weftSag" min="0" max="0.2" step="0.005"><b class="val"></b></label>
+    <label class="row"><span>span</span>
+      <select id="weftSpan" style="flex:0 0 150px"><option value="wall">whole wall</option><option value="band">within each band</option></select></label>
+
+    <h2>Borders <span style="float:right;text-transform:none;letter-spacing:0">outside → centre</span></h2>
+    <div id="borders"></div>
+    <div class="btnrow"><button id="btnAddBorder">+ border band</button></div>
+
+    <h2>Centre band — shajarah</h2>
+    <div class="band centre" id="centreBox">
+      <div class="grid">
+        <label>gap rows<input type="number" id="cGap" min="0" max="12" step="1"></label>
+        <label>pairs/col<input type="number" id="cDup" min="1" max="4" step="1"></label>
+        <label>row = ties<input type="number" id="cRowScale" min="1" max="4" step="1"></label>
+        <label class="full"><input type="checkbox" id="cFit" style="flex:0 0 auto"> fit sequence to height (ground fills the rest; gap rows ignored)</label>
+        <label class="full" style="margin-top:4px">glyphs, read top → bottom</label>
+      </div>
+      <div class="glyphs" id="glyphs"></div>
+      <div class="btnrow"><button id="btnAddGlyph">+ glyph</button><button id="btnGlyphsAuto">⚄ new sequence</button></div>
+    </div>
+    <p class="note">Border bands are short-period repeats from a fixed lexicon; <i>ground after</i> puts that many
+      plain warp columns (straight, untwined strands) between a band and the next. The centre is the free band: a
+      sequence of discrete glyphs separated by ground, read like a line of text. Ground rows spread the strands
+      evenly; glyph rows gather them.</p>
+
+    <h2>Bulb drop</h2>
+    <label class="row"><span>depth profile γ</span><input type="range" id="shedGamma" min="0.35" max="3" step="0.05"><b class="val"></b></label>
+    <label class="row"><span>tail length ×dy</span><input type="range" id="tailFactor" min="0" max="5" step="0.1"><b class="val"></b></label>
+    <label class="row"><span>blue-noise tries</span><input type="range" id="bnTries" min="1" max="40" step="1"><b class="val"></b></label>
+    <label class="row"><span>min bulb gap</span><input type="range" id="minGap" min="0" max="300" step="5"><b class="val"></b></label>
+    <label class="row"><span>no bulbs above</span><input type="range" id="topClear" min="0" max="4" step="0.05"><b class="val"></b></label>
+  </div>
+
+  <!-- ───────────────────────── CENTRE: view ───────────────────────── -->
+  <div id="stage">
+    <div id="topbar">
+      <div class="seg" id="modeSeg">
+        <button data-m="design" class="on">Design</button>
+        <button data-m="evolve">Evolve</button>
+      </div>
+      <div class="seg" id="viewSeg">
+        <button data-v="weave" class="on">Weave</button>
+        <button data-v="density">Density</button>
+        <button data-v="bulbs">Bulbs</button>
+        <button data-v="tech">Technical</button>
+      </div>
+      <button id="btnPolarity">◐ polarity</button>
+      <label class="row" style="margin:0"><span style="color:var(--dim)">view dist</span>
+        <input type="range" id="blur" min="0" max="30" step="0.5" style="flex:0 0 90px"><b class="val" style="flex:0 0 44px"></b></label>
+      <label class="row" style="margin:0"><span style="color:var(--dim)">line gain</span>
+        <input type="range" id="gain" min="0.3" max="4" step="0.1" style="flex:0 0 80px"><b class="val" style="flex:0 0 36px"></b></label>
+      <div class="spacer"></div>
+      <span id="genTime" style="font:10px var(--mono);color:var(--dim)"></span>
+    </div>
+    <div id="canvasWrap">
+      <canvas id="view"></canvas>
+      <div id="hud"></div>
+      <div id="evolveWrap">
+        <div id="evBar">
+          <span class="crumbs" id="evCrumbs" style="flex:1 1 200px"></span>
+          <label class="row" style="margin:0"><span style="color:var(--dim)">step</span>
+            <input type="range" id="evStep" min="0.1" max="1.5" step="0.05" value="0.7" style="flex:0 0 90px"><b class="val" style="flex:0 0 34px">0.70</b></label>
+          <label class="row" style="margin:0"><span style="color:var(--dim)">grid</span>
+            <select id="evGridN"><option>3</option><option selected>5</option><option>7</option></select></label>
+          <button id="evReroll" title="same parent, new random neighbours">↻ re-roll</button>
+          <button id="evBack" title="go back to the previous parent">← back</button>
+          <button id="evOpen" title="open the parent in the Design editor">open in editor ↗</button>
+          <select id="evFrom" title="start from a saved favourite"></select>
+        </div>
+        <div id="evGrid"></div>
+        <div id="evAxes"><span id="evAxX"></span><span id="evAxY"></span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ───────────────────────── RIGHT: analysis ───────────────────────── -->
+  <div class="col right">
+    <h2>Loom chart</h2>
+    <canvas class="chart" id="chLoom" height="150"></canvas>
+    <div id="loomStats"></div>
+    <p class="note">The pickup chart as it is actually woven: one column per pattern pair, one row per tie row,
+      dark = the pairs the strands gather into. This is the notation; the wall is its rendering.</p>
+
+    <h2>Weave</h2>
+    <canvas class="chart" id="chRib" height="90"></canvas>
+    <p class="note">Rib thickness at its thinnest point, row by row (top → floor). Ribs can only be as thick as the
+      cables still there — most cables have dropped to their bulbs by the lower third.</p>
+    <div id="weaveStats"></div>
+
+    <h2>Coverage vs height</h2>
+    <canvas class="chart" id="chCov" height="130"></canvas>
+    <p class="note"><span style="color:var(--accent)">Gold</span> is real bundled coverage, grey is cables laid flat;
+      the dashed line is the ≈50 % below which negative space reads.</p>
+    <div id="covStats"></div>
+
+    <h2>Bulb distribution</h2>
+    <canvas class="chart" id="chBulbX" height="60"></canvas>
+    <canvas class="chart" id="chBulbY" height="60"></canvas>
+    <div id="bulbStats"></div>
+
+    <h2>Cable schedule</h2>
+    <canvas class="chart" id="chLen" height="70"></canvas>
+    <div id="lenStats"></div>
+
+    <h2>Load</h2>
+    <div id="loadStats"></div>
+    <p class="note" id="loadNote"></p>
+
+    <h2>Export</h2>
+    <div class="btnrow">
+      <button id="exCables">cables.csv</button>
+      <button id="exBulbs">bulbs.csv</button>
+    </div>
+    <div class="btnrow">
+      <button id="exTies">tie-sheet.csv</button>
+      <button id="exCross">crossings.csv</button>
+    </div>
+    <div class="btnrow">
+      <button id="exSvg">elevation.svg</button>
+      <button id="exDxf">elevation.dxf</button>
+    </div>
+    <div class="btnrow">
+      <button id="exChart">loom-chart.txt</button>
+      <button id="exWeft">weft.csv</button>
+    </div>
+    <div class="btnrow">
+      <button id="exJson">design.json</button>
+    </div>
+    <div class="btnrow"><button id="exPng" class="primary">view as PNG</button></div>
+    <p class="note">SVG/DXF are 1:1 in millimetres. cables.csv carries the cut length per cable. loom-chart.txt is
+      the bitmask notation — the three-layer description minus the twining, which is in the twine parameters.</p>
+
+    <details>
+      <summary>Assumptions &amp; model</summary>
+      <p class="note">
+        • Flat elevation: everything is one plane against the wall, no depth — except at a crossing,
+          where one strand passes in front of the other.<br>
+        • Strands are <b>tied to one another at every tie row</b> they pass — that is what holds a
+          lateral run. A "loose weave" still needs these ties.<br>
+        • Below its last tie a cable hangs <b>plumb</b>, so the bulb x equals that tie's x. Tails spread the bulb
+          heights; the blue-noise picker spreads the x.<br>
+        • The nylon core means no stretch: arc length is conserved, so the cut length is exactly path + tail.<br>
+        • Tension at a tie = everything hanging below it. Lateral pull = T·sinθ; it must be resisted by the tie
+          into the neighbouring strand, and the net per row must land in the edge restraints.
+      </p>
+    </details>
+  </div>
+</div>
+
+<script>
+"use strict";
+/* ═══════════════════════════════════════════════════════════════════════════
+   Al Sadu Cable Weave — loom model
+   The warp is the cables, running down the wall. The composition is a row of
+   vertical bands laid out symmetrically about a centre band, exactly as an al
+   sadu strip is warped: border bands from a fixed lexicon of short-period
+   repeats, ground gaps between them, and a free centre band (shajarah) that
+   carries a sequence of discrete glyphs separated by ground.
+   Every motif is a bitmask chart — one column per pattern pair, one row per
+   pick. At each tie row the strands of a band are routed into that row's dark
+   cells, bunching where a row has few of them. That routing is the pickup.
+   A small antiphase zigzag between neighbouring strands is the twining.
+   Cables shed out of strands and hang plumb to a bulb.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ───────── helpers ───────── */
+const G = 9.80665;
+const clamp = (v,a,b)=> v<a?a:v>b?b:v;
+const lerp  = (a,b,t)=> a+(b-a)*t;
+const frac  = t => t-Math.floor(t);
+const tri   = t => 2*Math.abs(2*frac(t)-1)-1;          // [-1,1], tri(0)=+1
+const pmod  = (a,n)=> ((a%n)+n)%n;
+const fmt   = (v,d=2)=> (Math.abs(v)>=1000? v.toFixed(0) : v.toFixed(d));
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);
+  t=t+Math.imul(t^t>>>7,61|t)^t;return ((t^t>>>14)>>>0)/4294967296;};}
+
+/* ───────── the lexicon: border motifs ─────────
+   Charts read top → bottom, '1' = the pattern pair is picked to the front,
+   i.e. the band's strands gather there. Every chart tiles vertically.      */
+const LEX = {
+  stripe  :{label:"stripe — plain line",              rows:["1"]},
+  ground  :{label:"ground — even spread",             rows:["111"]},
+  hubub   :{label:"hubub — seeds (twist)",            rows:["10","01"]},
+  dealla  :{label:"dealla — ribs",                    rows:["111","111","010","010"]},
+  uwairjan:{label:"uwairjan — pebbles",               rows:["1100","1100","0011","0011"]},
+  zigzag  :{label:"zigzag",                           rows:["10000","01000","00100","00010","00001","00010","00100","01000"]},
+  ein     :{label:"ein — eye",                        rows:["00100","01010","10001","10001","01010","00100"]},
+  dhurs   :{label:"dhurs el khail — horse teeth",     rows:["1000","1100","1110","1111","1110","1100"]},
+  vees    :{label:"chevron — stacked V",              rows:["10001","01010","00100"]},
+  cross   :{label:"cross — X chain",                  rows:["10001","01010","00100","01010"]},
+  diamond :{label:"diamond — solid chain",            rows:["00100","01110","11111","01110"]},
+  shajar  :{label:"shajar — fir tree",                rows:["00100","01110","11111","00100"]},
+  ladder  :{label:"ladder — rungs",                   rows:["10001","10001","11111"]},
+  teethIn :{label:"teeth — facing pair",              rows:["1001","1101","1111","1101"]},
+};
+const LEX_KEYS=Object.keys(LEX);
+
+/* ───────── the glyph dictionary: centre band, 9 pairs wide ───────── */
+const GW=9;
+const GLYPHS = {
+  bigDiamond:{label:"large diamond", rows:[
+    "000010000","000101000","001000100","010000010","100000001","010000010","001000100","000101000","000010000"]},
+  nested:{label:"nested diamond", rows:[
+    "000010000","000101000","001000100","010010010","100101001","010010010","001000100","000101000","000010000"]},
+  solid:{label:"solid diamond", rows:[
+    "000010000","000111000","001111100","011111110","111111111","011111110","001111100","000111000","000010000"]},
+  hourglass:{label:"hourglass", rows:[
+    "100000001","010000010","001000100","000101000","000010000","000101000","001000100","010000010","100000001"]},
+  tree:{label:"tree", rows:[
+    "000010000","000111000","001111100","000010000","001111100","011111110","000010000","011111110","111111111","000010000"]},
+  arrow:{label:"arrow", rows:[
+    "000010000","000111000","001111100","011111110","000111000","000111000","000111000"]},
+  comb:{label:"comb (wasm)", rows:[
+    "111111111","101010101","101010101","101010101","111111111"]},
+  steps:{label:"stepped triangle", rows:[
+    "000010000","000111000","001111100","011111110","111111111"]},
+  eyes:{label:"double eye", rows:[
+    "010000010","101000101","010000010","111111111"]},
+  bars:{label:"bars", rows:["111111111","111111111","000010000","000010000"]},
+};
+const GLYPH_KEYS=Object.keys(GLYPHS);
+
+/* ───────── presets ───────── */
+const bd=(motif,dup,gap,phase)=>({motif,dup:dup||1,gap:gap==null?1:gap,phase:phase|0});
+const PRESETS = {
+  "Sadu strip (default)":{
+    rows:32, rowScale:1, twine:0.6, twinePer:4, mirror:true, maxAng:45,
+    grid:true, gridPitch:0.10, maxStep:2, laneOff:0.02, margin:0,
+    weftEvery:1, weftPhase:0, weftFloat:6, weftStep:3, weftJitter:0, weftHops:1, weftSag:0, weftSpan:"wall",
+    borders:[bd("stripe",2,1),bd("zigzag",1,1),bd("ein",1,1),bd("dhurs",1,1),bd("uwairjan",1,2)],
+    centre:{glyphs:["bigDiamond","tree","nested"],gap:3,dup:2,rowScale:2,fit:true}},
+  "Columns of eyes":{
+    rows:36, rowScale:1, twine:0.6, twinePer:4, mirror:true, maxAng:45,
+    grid:true, gridPitch:0.10, maxStep:2, laneOff:0.02, margin:0,
+    weftEvery:1, weftPhase:0, weftFloat:1, weftStep:1, weftJitter:0, weftHops:1, weftSag:0.02, weftSpan:"band",
+    borders:[bd("zigzag",1,1),bd("ein",1,1),bd("zigzag",1,1),bd("diamond",1,1),bd("ein",1,1)],
+    centre:{glyphs:["solid","solid","solid"],gap:2,dup:1,rowScale:2,fit:true}},
+  "Big shajarah":{
+    rows:34, rowScale:1, twine:0.55, twinePer:4, mirror:true, maxAng:45,
+    grid:true, gridPitch:0.12, maxStep:3, laneOff:0.02, margin:0,
+    weftEvery:1, weftPhase:0, weftFloat:8, weftStep:4, weftJitter:0, weftHops:1, weftSag:0.04, weftSpan:"wall",
+    borders:[bd("dhurs",1,1),bd("ein",1,1),bd("hubub",1,2)],
+    centre:{glyphs:["nested","solid"],gap:2,dup:3,rowScale:3,fit:true}},
+  "Ribs and seeds":{
+    rows:40, rowScale:1, twine:0.7, twinePer:3, mirror:true, maxAng:45,
+    grid:true, gridPitch:0.10, maxStep:1, laneOff:0.02, margin:0,
+    weftEvery:1, weftPhase:0, weftFloat:1, weftStep:1, weftJitter:0, weftHops:1, weftSag:0.02, weftSpan:"wall",
+    borders:[bd("hubub",1,1),bd("dealla",1,1),bd("hubub",1,1),bd("ladder",1,1),bd("dealla",1,2)],
+    centre:{glyphs:["comb","bars","comb","bars"],gap:3,dup:2,rowScale:1,fit:true}},
+  "Teeth border":{
+    rows:32, rowScale:1, twine:0.6, twinePer:5, mirror:true, maxAng:45,
+    grid:true, gridPitch:0.10, maxStep:2, laneOff:0.02, margin:0,
+    weftEvery:1, weftPhase:0, weftFloat:5, weftStep:2, weftJitter:0.3, weftHops:1, weftSag:0.03, weftSpan:"wall",
+    borders:[bd("stripe",3,1),bd("dhurs",1,0),bd("teethIn",1,1),bd("vees",1,2)],
+    centre:{glyphs:["steps","hourglass","steps"],gap:3,dup:2,rowScale:1,fit:true}},
+  "Sparse stripes":{
+    rows:28, rowScale:2, twine:0.5, twinePer:4, mirror:true, maxAng:40,
+    grid:true, gridPitch:0.125, maxStep:2, laneOff:0.025, margin:0,
+    weftEvery:1, weftPhase:0, weftFloat:10, weftStep:5, weftJitter:0, weftHops:1, weftSag:0.05, weftSpan:"wall",
+    borders:[bd("stripe",2,3),bd("cross",1,3),bd("stripe",2,3)],
+    centre:{glyphs:["bigDiamond"],gap:6,dup:2,rowScale:3,fit:true}},
+  "Asymmetric strip":{
+    rows:34, rowScale:1, twine:0.6, twinePer:4, mirror:false, maxAng:45,
+    grid:true, gridPitch:0.10, maxStep:2, laneOff:0.02, margin:0,
+    weftEvery:1, weftPhase:0, weftFloat:6, weftStep:2, weftJitter:0.3, weftHops:1, weftSag:0.03, weftSpan:"wall",
+    borders:[bd("zigzag",1,1),bd("ein",1,1),bd("dhurs",1,1),bd("shajar",2,1),bd("uwairjan",2,0),bd("dhurs",1,1),bd("ein",1,1),bd("zigzag",1,0)],
+    centre:{glyphs:["tree","arrow"],gap:3,dup:2,rowScale:1,fit:true}},
+};
+
+/* ───────── parameter state ───────── */
+const P = {
+  seed:12345, width:7, height:7, count:1000, dia:5.5, gpm:40, bulbMass:120,
+  rows:32, maxDepth:6.9, margin:0, maxAng:45, snap:0, pack:1,
+  grid:true, gridPitch:0.10, maxStep:2, laneOff:0.02,
+  rowScale:1, twine:1.0, twinePer:4, mirror:true,
+  weftEvery:1, weftPhase:0, weftFloat:6, weftStep:3, weftJitter:0, weftHops:1, weftSag:0.0, weftSpan:"wall", weftMax:4,
+  shedGamma:0.75, tailFactor:1.4, bnTries:14, topClear:0.4, minGap:60,
+  borders: PRESETS["Sadu strip (default)"].borders.map(b=>({...b})),
+  centre: {...PRESETS["Sadu strip (default)"].centre, glyphs:[...PRESETS["Sadu strip (default)"].centre.glyphs], fit:true},
+};
+let view="weave", polarity=1, blurPx=4, gain=1.2;
+let D = null;
+
+/* ═══════════════════════ COMPOSITION ═══════════════════════ */
+function centreRows(P, Reff){
+  const ground="1".repeat(GW), rows=[];
+  const gl=(P.centre.glyphs&&P.centre.glyphs.length)? P.centre.glyphs : ["bigDiamond"];
+  const glyphRows=gl.map(g=>(GLYPHS[g]||GLYPHS.bigDiamond).rows);
+  let gaps=gl.map(()=>Math.max(0,P.centre.gap|0)); gaps.push(Math.max(0,P.centre.gap|0));   // n+1 slots
+  if(P.centre.fit){
+    /* the placement process: the sequence is read once, top to bottom, and the
+       ground is distributed so the last glyph lands at the lowest tie      */
+    const rs=Math.max(1,P.centre.rowScale|0), avail=Math.floor((Reff||P.rows)/rs)+1;
+    const used=glyphRows.reduce((a,r)=>a+r.length,0);
+    const spare=Math.max(0, avail-used), slots=gl.length+1;
+    gaps=gaps.map(()=>Math.floor(spare/slots));
+    for(let i=0;i<spare-Math.floor(spare/slots)*slots;i++) gaps[(i%(slots-2||1))+1]++;   // remainder into the inner slots
+  }
+  for(let i=0;i<gl.length;i++){ for(let k=0;k<gaps[i];k++) rows.push(ground); rows.push(...glyphRows[i]); }
+  for(let k=0;k<gaps[gl.length];k++) rows.push(ground);
+  return rows.length? rows : [ground];
+}
+/* lay the bands out left → right: borders, centre, mirrored borders */
+function compose(P, padTo, Reff){
+  const seq=[]; let cols=0;
+  const push=(spec,rows,mirror,isCentre,name,isGround)=>{
+    const k=rows[0].length, dup=Math.max(1,spec.dup|0);
+    seq.push({rows,k,dup,cols:k*dup,c0:cols,mirror,isCentre,isGround:!!isGround,phase:spec.phase|0,
+              rs:Math.max(1,(isCentre? spec.rowScale : P.rowScale)|0), name});
+    cols+=k*dup;
+  };
+  /* ground between bands is plain warp — a strand per column running straight,
+     no pickup, no twining. A sadu strip has warp across its whole width.    */
+  const ground=(g,mirror)=>{ g=Math.max(0,g|0); if(g) push({dup:1,phase:0},["1".repeat(g)],mirror,false,"ground",true); };
+  const B=P.borders||[];
+  /* how many pairs the composition itself needs */
+  let need=0; for(const b of B){ need+=((LEX[b.motif]||LEX.stripe).rows[0].length)*Math.max(1,b.dup|0)+Math.max(0,b.gap|0); }
+  need+=GW*Math.max(1,P.centre.dup|0);
+  if(P.mirror) for(const b of B) need+=((LEX[b.motif]||LEX.stripe).rows[0].length)*Math.max(1,b.dup|0)+Math.max(0,b.gap|0);
+  const pad=Math.max(0,(padTo|0)-need), padL=Math.floor(pad/2), padR=pad-padL;
+  ground(padL,false);
+  for(const b of B){ const m=LEX[b.motif]||LEX.stripe; push(b,m.rows,false,false,b.motif); ground(b.gap,false); }
+  push(P.centre, centreRows(P,Reff), false, true, "centre");
+  if(P.mirror) for(let i=B.length-1;i>=0;i--){
+    ground(B[i].gap,true);
+    const m=LEX[B[i].motif]||LEX.stripe;
+    push(B[i], m.rows.map(s=>s.split("").reverse().join("")), true, false, B[i].motif);
+  }
+  ground(padR,true);
+  return {seq, cols:Math.max(1,cols), compCols:need};
+}
+const rowBits=(band,r)=> band.rows[pmod(Math.floor(r/band.rs)+band.phase, band.rows.length)];
+
+/* ═══════════════════════ GENERATOR ═══════════════════════ */
+function generate(P){
+  const t0 = performance.now();
+  const rng = mulberry32(P.seed>>>0);
+  const W=P.width, H=P.height, N=P.count;
+  const dia = P.dia/1000;
+  const maxD = Math.min(P.maxDepth, H);
+  const mg = P.margin;
+  const gridOn = !!P.grid;
+  /* on a grid, the tie rows ARE the grid rows */
+  const gridCols = gridOn ? Math.max(2, Math.round((W-2*mg)/P.gridPitch)) : 0;
+  const R = gridOn ? Math.max(4, Math.round(maxD/P.gridPitch)) : P.rows;
+  const dy = maxD/R;
+  const snap = (P.snap||0)/1000;
+
+  /* ── the warp: composition → strands (padded with ground to fill the grid) ── */
+  const L = compose(P, gridOn ? gridCols : 0, R);
+  const colPitch = (W-2*mg)/L.cols;                          // the sett (= grid pitch when the composition fits)
+  const compOverflow = gridOn && L.compCols>gridCols;
+  const bw = n => n<=0?0 : lerp(n*dia, dia*Math.sqrt(n/0.9), P.pack);
+  const allNodes=[]; let nid=0, cid=0;
+  let S=0; for(const b of L.seq) S+=b.cols;
+  const perStrand=Math.floor(N/S), extra=N%S;
+  for(const b of L.seq){
+    b.strands=[];
+    for(let c=0;c<b.cols;c++){
+      const n=perStrand+(nid<extra?1:0);
+      const cabs=[]; for(let j=0;j<n;j++) cabs.push(cid++);
+      const nd={id:nid++, band:b, c, cell:c, span:colPitch, xBase:mg+(b.c0+c+0.5)*colPitch, cables:cabs,
+                birth:0, parent:null, forkX:null, path:[], count:[], level:0};
+      b.strands.push(nd); allNodes.push(nd);
+    }
+  }
+  const active=allNodes;                                     // no forks in the loom model: the warp is fixed
+
+  /* ── cable records ── */
+  const cab = new Array(N);
+  for(let i=0;i<N;i++) cab[i]={id:i, anchorX:(i+0.5)*W/N, pts:[], shedRow:-1, bx:0, by:0, len:0, tail:0, node:-1, turns:0, hlen:0, floats:0, lastFloatRow:-1};
+
+  /* ── shed schedule: γ states the bulb-height distribution; the tail only
+        pushes bulbs down, so deconvolve the tail kernel (Richardson–Lucy) ── */
+  const T   = Math.max(0, P.tailFactor)*dy;
+  const clr = Math.max(0, P.topClear||0);
+  const nB  = Math.max(1, Math.ceil(H/dy));
+  const tLo=new Float64Array(R+1), tHi=new Float64Array(R+1);
+  const K = [];
+  for(let r=0;r<=R;r++){
+    const y0=r*dy;
+    let lo = Math.max(0, clr-y0), hi = Math.min(T, Math.max(0,H-y0));
+    if(hi<lo) hi=lo;
+    tLo[r]=lo; tHi[r]=hi;
+    const row=new Float64Array(nB);
+    const a=y0+lo, b=y0+hi;
+    if(b-a<1e-9) row[clamp(Math.floor(a/dy),0,nB-1)]=1;
+    else for(let j=0;j<nB;j++){
+      const l=Math.max(a,j*dy), u2=Math.min(b,(j+1)*dy);
+      if(u2>l) row[j]=(u2-l)/(b-a);
+    }
+    K.push(row);
+  }
+  const tgt=new Float64Array(nB);
+  for(let j=0;j<nB;j++){
+    const yc=(j+0.5)*dy;
+    if(yc<clr || yc>H){ tgt[j]=0; continue; }
+    const v=clamp(yc/H,1e-4,1);
+    tgt[j]=Math.max(1e-9, P.shedGamma*Math.pow(v,P.shedGamma-1));
+  }
+  let ts=0; for(let j=0;j<nB;j++) ts+=tgt[j];
+  if(ts<=0){ for(let j=0;j<nB;j++) tgt[j]=1; ts=nB; }
+  for(let j=0;j<nB;j++) tgt[j]/=ts;
+  const wRow=new Float64Array(R+1);
+  for(let r=0;r<=R;r++) wRow[r]=1/(R+1);
+  const kSum=new Float64Array(R+1);
+  for(let r=0;r<=R;r++){ let sm=0; for(let j=0;j<nB;j++) sm+=K[r][j]; kSum[r]=sm||1; }
+  const dImg=new Float64Array(nB), rat=new Float64Array(nB);
+  for(let it=0; it<60; it++){
+    dImg.fill(0);
+    for(let r=0;r<=R;r++){ const w=wRow[r]; if(w<=0)continue;
+      const kr=K[r]; for(let j=0;j<nB;j++) if(kr[j]) dImg[j]+=w*kr[j]; }
+    for(let j=0;j<nB;j++) rat[j] = tgt[j] / Math.max(dImg[j], 1e-12);
+    for(let r=0;r<=R;r++){
+      const kr=K[r]; let acc=0;
+      for(let j=0;j<nB;j++) if(kr[j]) acc += kr[j]*rat[j];
+      wRow[r] = Math.max(0, wRow[r]*acc/kSum[r]);
+    }
+  }
+  wRow[0]=0;
+  let wsum=0; for(let r=0;r<=R;r++) wsum+=wRow[r];
+  if(!(wsum>0)){ for(let r=1;r<=R;r++) wRow[r]=1; wsum=R; }
+  const shedCount = new Int32Array(R+1);
+  {
+    const frac0=[]; let base=0;
+    for(let r=0;r<=R;r++){ const e=wRow[r]/wsum*N;
+      shedCount[r]=Math.floor(e); base+=shedCount[r]; frac0.push([e-Math.floor(e),r]); }
+    frac0.sort((a,b)=>b[0]-a[0]);
+    for(let k=0;k<N-base;k++) shedCount[frac0[k%frac0.length][1]]++;
+  }
+
+  /* ── blue-noise grid for bulbs ── */
+  const rTarget = Math.sqrt((W*maxD)/N);
+  const cell = Math.max(0.02, rTarget);
+  const gw = Math.ceil(W/cell)+1, gh = Math.ceil(H/cell)+2;
+  const grid = new Array(gw*gh); for(let i=0;i<grid.length;i++) grid[i]=[];
+  const bulbs=[];
+  function gi(x,y){return clamp(Math.floor(y/cell),0,gh-1)*gw + clamp(Math.floor(x/cell),0,gw-1);}
+  function minDist(x,y){
+    const cx=clamp(Math.floor(x/cell),0,gw-1), cy=clamp(Math.floor(y/cell),0,gh-1);
+    let best=Infinity;
+    for(let j=Math.max(0,cy-2);j<=Math.min(gh-1,cy+2);j++)
+      for(let i=Math.max(0,cx-2);i<=Math.min(gw-1,cx+2);i++){
+        const a=grid[j*gw+i];
+        for(let k=0;k<a.length;k++){const d=(a[k][0]-x)**2+(a[k][1]-y)**2; if(d<best)best=d;}
+      }
+    return Math.sqrt(best);
+  }
+
+  /* ── the weaving: row by row ── */
+  const raster=new Uint8Array(L.cols*(R+1));               // the chart as woven, for display/export
+  const nsAt = new Int32Array(R+1).fill(S);
+  const crossings=[]; let cableCross=0, maxAngle=0, runCells=0, runs=0, runLen=0;
+  /* ── weft: cables that travel across ── */
+  const hops=[]; let weftRows=0, weftCables=0, weftLen=0, weftOver=0, weftOverCables=0;
+  const weftOn = (P.weftEvery|0)>0, maxFloats=Math.max(1,P.weftMax|0);
+  const ndIndex=new Map(); allNodes.forEach((nd,i)=>ndIndex.set(nd.id,i));
+  function doFloat(A,B,r,count){
+    const ia=ndIndex.get(A.id), ib=ndIndex.get(B.id);
+    const xa=A.path[A.path.length-1], xb=B.path[B.path.length-1];
+    let moved=0;
+    for(let k=0;k<count;k++){
+      if(A.cables.length<1) break;                           // a strand may give its last cable to the rib
+      const toRight = ib>ia;
+      /* weft duty goes to the cable in this strand that has travelled least so far,
+         never twice in one row, never more than weftMax times in its life — so the
+         horizontal work is shared by all 1000 cables instead of a few survivors
+         shuttling back and forth low on the wall into 30 m cuts.              */
+      let idx=-1, best=Infinity;
+      for(let q=0;q<A.cables.length;q++){ const c=cab[A.cables[q]];
+        if(c.lastFloatRow===r || c.floats>=maxFloats) continue;
+        const h=c.hlen + rng()*0.02; if(h<best){best=h; idx=q;} }
+      if(idx<0) break;
+      const id = A.cables.splice(idx,1)[0];
+      cab[id].hlen += Math.abs(xb-xa); cab[id].floats++; cab[id].lastFloatRow=r;
+      if(toRight) B.cables.unshift(id); else B.cables.push(id);
+      const c=cab[id]; c.node=B.id;
+      const wB=bw(B.cables.length), offB = toRight ? -wB/2 : wB/2;
+      const lane = gridOn ? (toRight? -P.laneOff : P.laneOff) : 0;
+      c.pts.push(xb+offB, r*dy + lane + P.weftSag*(0.5+0.5*k/Math.max(1,count)));   // stacked wefts sit a little apart
+      moved++;
+    }
+    if(moved){
+      const lo=Math.min(ia,ib), hi=Math.max(ia,ib);
+      let over=0, overC=0; for(let q=lo+1;q<hi;q++){ over++; overC+=allNodes[q].cables.length; }
+      hops.push({r, y:r*dy, xa, xb, a:A.id, b:B.id, n:moved, over});
+      weftCables+=moved; weftLen+=moved*Math.abs(xb-xa); weftOver+=over*moved; weftOverCables+=overC*moved;
+    }
+    return moved;
+  }
+  const ribCov=new Int32Array(allNodes.length);            // cables present along the current weft row, per cell
+  const ribRow=new Float64Array(R+1).fill(-1);            // thinnest point of the rib at each row (-1 = no weft row)
+  let ribsFull=0, ribMinSum=0, ribMeanSum=0;
+  function weftRow(r){
+    const k=Math.floor((r+(P.weftPhase|0))/P.weftEvery);
+    const dirRight = (k%2)===0;
+    const groups = P.weftSpan==="band" ? L.seq.filter(b=>!b.isGround).map(b=>b.strands) : [allNodes];
+    const f0=Math.max(1,P.weftFloat|0), st=Math.max(1,P.weftStep|0), hopsN=Math.max(1,P.weftHops|0);
+    const fl=()=> P.weftJitter>0 ? Math.max(1,Math.round(f0*(1+(rng()*2-1)*P.weftJitter))) : f0;
+    ribCov.fill(0);
+    for(const arr of groups){
+      const n=arr.length; if(n<2) continue;
+      /* runs start every `st` strands and each covers `f` cells; the last run is
+         clamped to the edge so the rib reaches the wall, then hands over       */
+      const lead = Math.max(0, f0-st);                       // runs that would have started before the edge
+      const off = Math.floor(rng()*st);                      // start strands shift every row (seeded), independent of
+                                                             // the direction parity, so every strand and every cable
+                                                             // takes a turn at weft duty
+      if(dirRight){ for(let i0=-lead-off;i0<n-1;i0+=st){ const f=fl(), i=Math.max(0,i0), j=Math.min(n-1,i0+f); if(j>i){ const m=doFloat(arr[i],arr[j],r,hopsN); if(m) for(let q=ndIndex.get(arr[i].id);q<ndIndex.get(arr[j].id);q++) ribCov[q]+=m; } } }
+      else        { for(let i0=n-1+lead+off;i0>0;i0-=st){ const f=fl(), i=Math.min(n-1,i0), j=Math.max(0,i0-f); if(j<i){ const m=doFloat(arr[i],arr[j],r,hopsN); if(m) for(let q=ndIndex.get(arr[j].id);q<ndIndex.get(arr[i].id);q++) ribCov[q]+=m; } } }
+    }
+    /* continuity: is every cell between the first and last strand covered? */
+    let mn=Infinity, sum=0; for(let q=0;q<allNodes.length-1;q++){ if(ribCov[q]<mn) mn=ribCov[q]; sum+=ribCov[q]; }
+    ribRow[r]=isFinite(mn)?mn:0;
+    if(P.weftSpan==="wall"){ if(mn>=1) ribsFull++; ribMinSum+=mn; ribMeanSum+=sum/Math.max(1,allNodes.length-1); }
+    weftRows++;
+  }
+  const step = Math.max(1e-6, dy*Math.tan(clamp(P.maxAng,5,85)*Math.PI/180));
+  const twA = P.twine*colPitch*0.5;
+  for(let r=0;r<=R;r++){
+    for(const b of L.seq){
+      /* this pick's dark cells, expanded to strand cells */
+      const bits=rowBits(b,r); const dark=[];
+      for(let k=0;k<b.k;k++) if(bits[k]==="1") for(let d=0;d<b.dup;d++) dark.push(k*b.dup+d);
+      if(!b.isGround) for(const cidx of dark) raster[r*L.cols + b.c0 + cidx]=1;
+      const n=b.strands.length, Dk=dark.length;
+      /* monotone pickup: the j-th strand goes to the dark cell of matching rank */
+      for(let j=0;j<n;j++){
+        const nd=b.strands[j];
+        if(Dk>0) nd.cell = dark[Math.min(Dk-1, Math.floor((j+0.5)*Dk/n))];
+      }
+      /* twining on the grid: neighbouring strands exchange columns along the row
+         line for one period, then exchange back — an over/under you can build */
+      if(gridOn && P.twine>=0.5 && n>1 && !b.isGround){
+        const per=Math.max(1,P.twinePer|0), ph=Math.floor(r/per);
+        if(ph%2===1){ const start=Math.floor(ph/2)%2;
+          for(let j=start;j+1<n;j+=2){ const A=b.strands[j],Bs=b.strands[j+1]; const t=A.cell; A.cell=Bs.cell; Bs.cell=t; } }
+      }
+      const groups=new Map();
+      for(const nd of b.strands){ if(!groups.has(nd.cell)) groups.set(nd.cell,[]); groups.get(nd.cell).push(nd); }
+      for(const [cellIdx,list] of groups){
+        const m=list.length, sp = m>1 ? Math.min(colPitch*0.6/(m-1), colPitch*0.3) : 0;
+        list.forEach((nd,i)=>{
+          let x = mg + (b.c0+cellIdx+0.5)*colPitch + (i-(m-1)/2)*sp;
+          const prev = nd.path.length? nd.path[nd.path.length-1] : null;
+          const w=bw(nd.cables.length), nc=nd.cables.length, y=r*dy;
+          if(gridOn){
+            /* orthogonal: arrive vertically, run along the row line, at most maxStep cells */
+            if(prev!==null){
+              const dc=Math.round((x-prev)/colPitch), lim=Math.max(1,P.maxStep|0);
+              if(Math.abs(dc)>lim) x = prev + Math.sign(dc)*lim*colPitch + (x - (prev+dc*colPitch));
+            }
+            x = clamp(x, mg+w/2, W-mg-w/2);
+            nd.path.push(x); nd.count.push(nc);
+            const moved = prev!==null && Math.abs(x-prev)>colPitch*0.5;
+            if(moved){ const lane = x>prev ? -P.laneOff : P.laneOff; runCells+=Math.abs(Math.round((x-prev)/colPitch)); runs++; runLen+=Math.abs(x-prev);
+              for(let k=0;k<nc;k++){ const off = nc>1?((k/(nc-1))-0.5)*w:0;
+                cab[nd.cables[k]].pts.push(prev+off, y+lane, x+off, y+lane); cab[nd.cables[k]].node=nd.id; } }
+            else for(let k=0;k<nc;k++){ const off = nc>1?((k/(nc-1))-0.5)*w:0; cab[nd.cables[k]].pts.push(x+off, y); cab[nd.cables[k]].node=nd.id; }
+          } else {
+            if(!b.isGround) x += twA*tri(r/Math.max(1,P.twinePer) + (nd.c%2)*0.5);   // twining
+            if(prev!==null) x = prev + clamp(x-prev, -step, step);           // no run steeper than maxAng
+            if(snap>0) x=Math.round(x/snap)*snap;
+            x = clamp(x, mg+w/2, W-mg-w/2);
+            nd.path.push(x); nd.count.push(nc);
+            for(let k=0;k<nc;k++){
+              const off = nc>1 ? ((k/(nc-1))-0.5)*w : 0;
+              cab[nd.cables[k]].pts.push(x+off, y); cab[nd.cables[k]].node=nd.id;
+            }
+          }
+        });
+      }
+    }
+    /* weft row? cables travel across, then belong to the strand they landed on */
+    if(weftOn && r>0 && ((r+(P.weftPhase|0)) % P.weftEvery)===0) weftRow(r);
+    /* crossings between row r-1 and r */
+    if(r>0){
+      const seg=[]; let maxMove=0;
+      for(const nd of active){
+        if(nd.path.length<2) continue;
+        const a=nd.path[nd.path.length-2], bb=nd.path[nd.path.length-1];
+        seg.push({a,b:bb,nd}); const mv=Math.abs(bb-a); if(mv>maxMove)maxMove=mv;
+        const ang=Math.atan2(mv,dy); if(ang>maxAngle)maxAngle=ang;
+      }
+      seg.sort((p,q)=>p.a-q.a);
+      const win=2*maxMove+1e-6;
+      for(let i=0;i<seg.length;i++){
+        const si=seg[i];
+        for(let j=i+1;j<seg.length && seg[j].a-si.a<=win;j++){
+          const sj=seg[j], da=sj.a-si.a, db=si.b-sj.b;
+          if(da>1e-6 && db>1e-6){
+            const t=da/(da+db);
+            crossings.push({r, x:si.a+(si.b-si.a)*t, y: gridOn? r*dy : (r-1)*dy+t*dy, a:si.nd.id, b:sj.nd.id,
+                            na:si.nd.cables.length, nb:sj.nd.cables.length});
+            cableCross += si.nd.cables.length*sj.nd.cables.length;
+          }
+        }
+      }
+    }
+    /* shed cables → bulbs */
+    let need = shedCount[r]; if(r===0) need=0;
+    while(need>0){
+      const pool = active.filter(n=>n.cables.length>0);
+      if(!pool.length) break;
+      let cum=0; const cw=[];
+      for(const n of pool){ cum+=n.cables.length; cw.push(cum); }
+      let best=null, bestD=-1;
+      const tries = Math.min(P.bnTries, Math.max(1, pool.length*2));
+      const gapM = (P.minGap||0)/1000;
+      for(let batch=0; batch<4 && bestD<gapM; batch++)
+      for(let t=0;t<tries;t++){
+        const v=rng()*cum; let lo=0,hi=cw.length-1;
+        while(lo<hi){const m=(lo+hi)>>1; if(cw[m]<=v)lo=m+1;else hi=m;}
+        const nd=pool[lo], n=nd.cables.length;
+        const side = rng()<0.5 ? 0 : n-1;
+        const w=bw(n), off = n>1?((side/(n-1))-0.5)*w:0;
+        const x = nd.path[nd.path.length-1]+off;
+        const y = clamp(r*dy + tLo[r] + rng()*(tHi[r]-tLo[r]), 0, H);
+        const d = minDist(x,y);
+        if(d>bestD){bestD=d; best={nd,side,x,y};}
+      }
+      if(!best) break;
+      const {nd,side,x,y}=best;
+      const id = nd.cables.splice(side,1)[0];
+      const c = cab[id];
+      c.shedRow=r; c.bx=x; c.by=y; c.tail=y-r*dy;
+      c.pts[c.pts.length-2]=x; c.pts.push(x,y);
+      bulbs.push([x,y,id]); grid[gi(x,y)].push([x,y,id]);
+      need--;
+    }
+  }
+  for(const nd of active) while(nd.cables.length){
+    const id=nd.cables.pop(), c=cab[id];
+    const x=nd.path[nd.path.length-1], y=clamp(R*dy+tLo[R]+rng()*(tHi[R]-tLo[R]),0,H);
+    c.shedRow=R; c.bx=x; c.by=y; c.tail=y-R*dy; c.pts.push(x,y);
+    bulbs.push([x,y,id]); grid[gi(x,y)].push([x,y,id]);
+  }
+
+  /* ── lengths & turns ── */
+  let totLen=0, minL=Infinity, maxL=0, turnsTot=0, turnsMax=0;
+  for(const c of cab){
+    const pt=c.pts; let Lg=0, turns=0, lastDir=0;
+    for(let i=2;i<pt.length;i+=2){
+      const dx=pt[i]-pt[i-2];
+      Lg += Math.hypot(dx, pt[i+1]-pt[i-1]);
+      if(Math.abs(dx)>0.004){ const d=dx>0?1:-1; if(lastDir && d!==lastDir) turns++; lastDir=d; }
+    }
+    c.len=Lg; c.turns=turns; totLen+=Lg; turnsTot+=turns; if(turns>turnsMax)turnsMax=turns;
+    if(Lg<minL)minL=Lg; if(Lg>maxL)maxL=Lg;
+  }
+
+  /* ── coverage per row (bundled + flat), incl. plumb tails ── */
+  const NBIN=140;
+  const covB=new Float64Array(R+1), covF=new Float64Array(R+1), alive=new Int32Array(R+1);
+  const covMap=new Float64Array((R+1)*NBIN);
+  for(const nd of allNodes){
+    for(let i=0;i<nd.path.length;i++){
+      const r=nd.birth+i; if(r>R)break;
+      const n=nd.count[i]; if(!n)continue;
+      alive[r]+=n; covB[r]+=bw(n); covF[r]+=n*dia;
+      const x0=nd.path[i]-bw(n)/2, x1=nd.path[i]+bw(n)/2;
+      const b0=clamp(Math.floor(x0/W*NBIN),0,NBIN-1), b1=clamp(Math.floor(x1/W*NBIN),0,NBIN-1);
+      for(let b=b0;b<=b1;b++) covMap[r*NBIN+b] += bw(n)/((b1-b0+1)*(W/NBIN));
+    }
+  }
+  for(const c of cab){
+    const rEnd = Math.min(R, Math.floor(c.by/dy));
+    for(let r=c.shedRow+1; r<=rEnd; r++){
+      alive[r]++; covB[r]+=dia; covF[r]+=dia;
+      covMap[r*NBIN + clamp(Math.floor(c.bx/W*NBIN),0,NBIN-1)] += dia/(W/NBIN);
+    }
+  }
+  for(let r=0;r<=R;r++){ covB[r]/=W; covF[r]/=W; }
+
+  /* ── tension & lateral force at ties ── */
+  const gm = P.gpm/1000, bm = P.bulbMass/1000;
+  let maxLat=0, maxLatAt=null, topLoad=0;
+  const rowLat=new Float64Array(R+1);
+  for(const c of cab) topLoad += (c.len*gm + bm)*G;
+  for(const nd of allNodes){
+    nd.T=[]; nd.lat=[];
+    for(let i=0;i<nd.path.length;i++){
+      const r=nd.birth+i, n=nd.count[i];
+      const meanRemain = Math.max(0, (maxD - r*dy)) * 1.08;
+      const Tn = n*(meanRemain*gm + bm)*G;
+      let lat;
+      if(gridOn){ const dx = i>0 ? nd.path[i]-nd.path[i-1] : 0; lat = Math.abs(dx)>1e-6 ? Tn*Math.sign(dx) : 0; }
+      else {
+        const sIn  = i>0 ? (nd.path[i]-nd.path[i-1])/Math.hypot(nd.path[i]-nd.path[i-1],dy) : 0;
+        const sOut = i<nd.path.length-1 ? (nd.path[i+1]-nd.path[i])/Math.hypot(nd.path[i+1]-nd.path[i],dy) : sIn;
+        lat = Tn*(sOut-sIn);
+      }
+      nd.T.push(Tn); nd.lat.push(lat);
+      rowLat[r]+=lat;
+      if(Math.abs(lat)>Math.abs(maxLat)){maxLat=lat; maxLatAt={r,x:nd.path[i],n};}
+    }
+  }
+
+  /* ── bulb statistics ── */
+  bulbs.sort((a,b)=>a[0]-b[0]);
+  let nnSum=0, nnMin=Infinity;
+  const nn=new Float64Array(bulbs.length);
+  for(let i=0;i<bulbs.length;i++){
+    const [x,y]=bulbs[i]; let best=Infinity;
+    for(let j=i+1;j<bulbs.length && bulbs[j][0]-x<Math.sqrt(best);j++){
+      const d=(bulbs[j][0]-x)**2+(bulbs[j][1]-y)**2; if(d<best)best=d;
+    }
+    for(let j=i-1;j>=0 && x-bulbs[j][0]<Math.sqrt(best);j--){
+      const d=(bulbs[j][0]-x)**2+(bulbs[j][1]-y)**2; if(d<best)best=d;
+    }
+    nn[i]=Math.sqrt(best); nnSum+=nn[i]; if(nn[i]<nnMin)nnMin=nn[i];
+  }
+  const nnMean=nnSum/Math.max(1,bulbs.length);
+  const UX=14, UY=14, ucell=new Int32Array(UX*UY);
+  for(const b of bulbs) ucell[clamp(Math.floor(b[1]/H*UY),0,UY-1)*UX+clamp(Math.floor(b[0]/W*UX),0,UX-1)]++;
+  let um=0; for(const v of ucell) um+=v; um/=ucell.length;
+  let uv=0; for(const v of ucell) uv+=(v-um)**2; uv=Math.sqrt(uv/ucell.length);
+  const cv = um? uv/um : 0;
+  let sliceCV=0, sliceLo=0, sliceHi=0;
+  {
+    const sh=0.5, nS=Math.max(1,Math.round(H/sh)), hist=new Int32Array(nS);
+    for(const b of bulbs) hist[clamp(Math.floor(b[1]/sh),0,nS-1)]++;
+    const keep=[];
+    for(let j=0;j<nS;j++) if(j*sh>=clr-1e-9 && (j+1)*sh<=H+1e-9) keep.push(hist[j]);
+    if(keep.length>1){
+      let m=0; for(const v of keep) m+=v; m/=keep.length;
+      let sd=0; for(const v of keep) sd+=(v-m)**2; sd=Math.sqrt(sd/keep.length);
+      sliceCV = m? sd/m : 0;
+      sliceLo = Math.min(...keep); sliceHi = Math.max(...keep);
+    }
+  }
+  let peakCov=0, peakRow=0;
+  for(let r=0;r<=R;r++) if(covB[r]>peakCov){peakCov=covB[r]; peakRow=r;}
+  let jam=0, jamY=0, jamX=0, jamBins=0;
+  for(let r=0;r<=R;r++) for(let b=0;b<NBIN;b++){
+    const v=covMap[r*NBIN+b];
+    if(v>1.0) jamBins++;
+    if(v>jam){ jam=v; jamY=r*dy; jamX=(b+0.5)*W/NBIN; }
+  }
+
+  const t1=performance.now();
+  return {P:{...P,borders:P.borders.map(b=>({...b})),centre:{...P.centre,glyphs:[...P.centre.glyphs]}},
+          W,H,N,R,dy,dia,maxD, layout:L, colPitch, S, perStrand, raster,
+          cab, bulbs, nodes:allNodes, alive, covB, covF, covMap, NBIN, nsAt,
+          crossings, cableCross, turnsMean:turnsTot/N, turnsMax, maxAngle,
+          hops, weftRows, weftCables, weftLen, weftOver, weftOverCables,
+          ribsFull, ribRow, ribMinMean: weftRows? ribMinSum/weftRows : 0, ribThick: weftRows? ribMeanSum/weftRows : 0,
+          floatsMax: cab.reduce((m,c)=>Math.max(m,c.floats),0), neverFloat: cab.filter(c=>!c.floats).length,
+          gridOn, gridCols, compOverflow, runCells, runs, runLen,
+          jam,jamY,jamX,jamBins,binW:W/NBIN, sliceCV,sliceLo,sliceHi,peakCov,peakRow,
+          totLen, minL, maxL, meanL:totLen/N,
+          topLoad, rowLat, maxLat, maxLatAt, nn, nnMean, nnMin, cv, rTarget,
+          shedCount, ms:t1-t0, bw};
+}
+
+/* ═══════════════════════ RENDER ═══════════════════════ */
+const cv = document.getElementById("view");
+const ctx = cv.getContext("2d");
+let scale=1;
+
+function fitCanvas(){
+  const wrap=document.getElementById("canvasWrap");
+  const pad=26;
+  const aw=wrap.clientWidth-pad*2, ah=wrap.clientHeight-pad*2;
+  if(!D){return;}
+  const ar=D.W/D.H;
+  let w=aw, h=w/ar; if(h>ah){h=ah; w=h*ar;}
+  const dpr=Math.min(2,window.devicePixelRatio||1);
+  cv.style.width=w+"px"; cv.style.height=h+"px";
+  cv.width=Math.round(w*dpr); cv.height=Math.round(h*dpr);
+  scale = cv.width/D.W;
+}
+function draw(){
+  if(!D) return;
+  fitCanvas();
+  const bg = polarity? "#f2ede4" : "#080706";
+  const fg = polarity? "#0d0b09" : "#efe9de";
+  ctx.setTransform(1,0,0,1,0,0);
+  ctx.fillStyle=bg; ctx.fillRect(0,0,cv.width,cv.height);
+  const lw = Math.max(0.35, D.dia*scale)*gain;
+  if(view==="density"){ drawDensity(bg,fg,lw); }
+  else if(view==="bulbs"){ drawBulbs(bg,fg); }
+  else if(view==="tech"){ drawTech(bg,fg,lw); }
+  else { drawWeave(fg,lw,true); }
+}
+function strokeCables(colour,lw,alpha){
+  ctx.lineWidth=lw; ctx.strokeStyle=colour; ctx.globalAlpha=alpha;
+  ctx.lineJoin="round"; ctx.lineCap="round";
+  ctx.beginPath();
+  for(const c of D.cab){
+    const p=c.pts; if(p.length<4)continue;
+    ctx.moveTo(p[0]*scale, p[1]*scale);
+    for(let i=2;i<p.length;i+=2) ctx.lineTo(p[i]*scale, p[i+1]*scale);
+  }
+  ctx.stroke(); ctx.globalAlpha=1;
+}
+function drawWeave(fg,lw,withBulbs){
+  strokeCables(fg,lw,0.92);
+  if(withBulbs){
+    const r=Math.max(1.1, 0.012*scale);
+    ctx.fillStyle = polarity? "#c8892a" : "#ffd98a";
+    ctx.beginPath();
+    for(const b of D.bulbs){ ctx.moveTo(b[0]*scale+r,b[1]*scale); ctx.arc(b[0]*scale,b[1]*scale,r,0,6.2832); }
+    ctx.fill();
+  }
+}
+function drawDensity(bg,fg,lw){
+  ctx.save();
+  ctx.filter = blurPx>0 ? `blur(${blurPx*(cv.width/1000)}px)` : "none";
+  strokeCables(fg, Math.max(0.35, D.dia*scale)*gain, 1);
+  ctx.restore(); ctx.filter="none";
+}
+function drawBulbs(bg,fg){
+  strokeCables(fg, Math.max(0.3,D.dia*scale)*0.5, 0.13);
+  const rr=Math.max(1.6, 0.02*scale);
+  for(const b of D.bulbs){
+    const x=b[0]*scale, y=b[1]*scale;
+    const g=ctx.createRadialGradient(x,y,0,x,y,rr*3.2);
+    g.addColorStop(0, polarity?"rgba(200,137,42,.95)":"rgba(255,225,160,.95)");
+    g.addColorStop(1, polarity?"rgba(200,137,42,0)":"rgba(255,200,90,0)");
+    ctx.fillStyle=g; ctx.beginPath(); ctx.arc(x,y,rr*3.2,0,6.2832); ctx.fill();
+  }
+  ctx.fillStyle=polarity?"#3a2a10":"#fff6e0";
+  ctx.beginPath();
+  for(const b of D.bulbs){ const r=rr*0.5; ctx.moveTo(b[0]*scale+r,b[1]*scale); ctx.arc(b[0]*scale,b[1]*scale,r,0,6.2832);}
+  ctx.fill();
+}
+function drawTech(bg,fg,lw){
+  for(const b of D.layout.seq){
+    const x0=(D.P.margin + b.c0*D.colPitch)*scale, x1=(D.P.margin+(b.c0+b.cols)*D.colPitch)*scale;
+    ctx.fillStyle = b.isCentre ? (polarity?"rgba(216,162,74,.10)":"rgba(216,162,74,.12)") : (polarity?"rgba(127,179,163,.09)":"rgba(127,179,163,.10)");
+    ctx.fillRect(x0,0,x1-x0,D.H*scale);
+  }
+  ctx.strokeStyle = polarity? "rgba(0,0,0,.10)":"rgba(255,255,255,.10)"; ctx.lineWidth=1;
+  ctx.beginPath();
+  for(let m=0;m<=Math.ceil(D.W);m++){ctx.moveTo(m*scale,0);ctx.lineTo(m*scale,D.H*scale);}
+  for(let m=0;m<=Math.ceil(D.H);m++){ctx.moveTo(0,m*scale);ctx.lineTo(D.W*scale,m*scale);}
+  ctx.stroke();
+  ctx.strokeStyle = polarity? "rgba(216,162,74,.45)":"rgba(216,162,74,.35)";
+  ctx.setLineDash([4,5]); ctx.beginPath();
+  for(let r=0;r<=D.R;r++){ctx.moveTo(0,r*D.dy*scale);ctx.lineTo(D.W*scale,r*D.dy*scale);}
+  ctx.stroke(); ctx.setLineDash([]);
+  for(const nd of D.nodes){
+    if(!nd.path.length)continue;
+    ctx.beginPath();
+    for(let i=0;i<nd.path.length;i++){
+      const X=nd.path[i]*scale, Y=(nd.birth+i)*D.dy*scale;
+      if(i===0) ctx.moveTo(X,Y); else ctx.lineTo(X,Y);
+    }
+    ctx.lineWidth=Math.max(1, D.bw(nd.count[0]||1)*scale);
+    ctx.strokeStyle = polarity? "rgba(13,11,9,.6)":"rgba(239,233,222,.6)";
+    ctx.stroke();
+  }
+  ctx.fillStyle = polarity? "rgba(40,120,100,.85)" : "rgba(127,179,163,.9)";
+  const cr=Math.max(1.6, 2.6*scale/200);
+  ctx.beginPath();
+  for(const c of D.crossings){ ctx.moveTo(c.x*scale+cr,c.y*scale); ctx.arc(c.x*scale,c.y*scale,cr,0,6.2832); }
+  ctx.fill();
+  /* weft floats */
+  ctx.strokeStyle = polarity? "rgba(40,120,100,.9)" : "rgba(127,179,163,.95)";
+  ctx.lineWidth=Math.max(1.5, 3*scale/200); ctx.beginPath();
+  for(const h of D.hops){ ctx.moveTo(h.xa*scale,h.y*scale); ctx.lineTo(h.xb*scale,(h.y+D.P.weftSag*0.5)*scale); }
+  ctx.stroke();
+  let lim=0; for(const nd of D.nodes) for(const l of nd.lat) lim=Math.max(lim,Math.abs(l));
+  for(const nd of D.nodes) for(let i=0;i<nd.lat.length;i++){
+    const a=Math.abs(nd.lat[i]); if(lim<=0||a<lim*0.5)continue;
+    const X=nd.path[i]*scale, Y=(nd.birth+i)*D.dy*scale;
+    ctx.fillStyle=`rgba(224,113,74,${0.25+0.6*a/lim})`;
+    ctx.beginPath(); ctx.arc(X,Y,Math.max(2.5,4*scale/200),0,6.2832); ctx.fill();
+  }
+  ctx.fillStyle=polarity?"#c8892a":"#ffd98a";
+  const r=Math.max(1.1,0.01*scale); ctx.beginPath();
+  for(const b of D.bulbs){ctx.moveTo(b[0]*scale+r,b[1]*scale);ctx.arc(b[0]*scale,b[1]*scale,r,0,6.2832);}
+  ctx.fill();
+}
+
+/* ═══════════════════════ CHARTS ═══════════════════════ */
+function chart(id,fn){
+  const c=document.getElementById(id);
+  const dpr=Math.min(2,window.devicePixelRatio||1);
+  const w=c.clientWidth||260, h=parseInt(c.getAttribute("height"));
+  c.width=w*dpr; c.height=h*dpr;
+  const x=c.getContext("2d"); x.setTransform(dpr,0,0,dpr,0,0);
+  x.clearRect(0,0,w,h); fn(x,w,h);
+}
+function drawCharts(X){ const D0=D; if(X) D=X; try{ drawChartsBody(); } finally { D=D0; } }
+function drawChartsBody(){
+  if(!D)return;
+  chart("chLoom",(x,w,h)=>{
+    const cols=D.layout.cols, R=D.R;
+    const cw=w/cols, ch=(h-2)/(R+1);
+    x.fillStyle="#f2ede4"; x.fillRect(0,0,w,h);
+    x.fillStyle="#e2dbcf";
+    for(const b of D.layout.seq) if(b.isGround) x.fillRect(b.c0*cw,0,b.cols*cw,h);
+    x.fillStyle="#0d0b09";
+    for(let r=0;r<=R;r++) for(let c=0;c<cols;c++) if(D.raster[r*cols+c]) x.fillRect(c*cw, 1+r*ch, Math.max(0.6,cw-0.4), Math.max(0.6,ch-0.4));
+    for(const b of D.layout.seq) if(b.isCentre){ x.strokeStyle="rgba(216,162,74,.9)"; x.lineWidth=1; x.strokeRect(b.c0*cw+0.5,0.5,b.cols*cw-1,h-1); }
+  });
+  chart("chRib",(x,w,h)=>{
+    const R=D.R, pad=18, bw=(w-pad-4)/(R+1);
+    x.strokeStyle="#332e28"; x.strokeRect(pad,4,w-pad-6,h-18);
+    let mx=1; for(let r=0;r<=R;r++) mx=Math.max(mx,D.ribRow[r]);
+    for(let r=0;r<=R;r++){ const v=D.ribRow[r]; if(v<0) continue;
+      const bh=(v/mx)*(h-22); x.fillStyle = v>=1 ? "#7fb3a3" : "#e0714a"; x.fillRect(pad+r*bw, h-14-bh, Math.max(1,bw-0.6), Math.max(bh, v>0?1:0));
+      if(v===0){ x.fillStyle="#e0714a"; x.fillRect(pad+r*bw, h-15, Math.max(1,bw-0.6), 1.5); } }
+    x.fillStyle="#9a9186"; x.font="9px ui-monospace,monospace";
+    x.fillText("0 m",pad-2,h-3); x.fillText(fmt(D.maxD,1)+" m",w-30,h-3); x.fillText(mx+" cables",pad+2,12);
+  });
+  chart("chCov",(x,w,h)=>{
+    const pad=18;
+    x.strokeStyle="#332e28"; x.lineWidth=1;
+    x.strokeRect(pad,4,w-pad-6,h-18);
+    const X50 = pad + 0.5*(w-pad-6);
+    x.setLineDash([3,3]); x.strokeStyle="#7fb3a3"; x.beginPath();
+    x.moveTo(X50,4); x.lineTo(X50,h-14); x.stroke(); x.setLineDash([]);
+    const px=(v)=>pad+clamp(v,0,1)*(w-pad-6), py=(r)=>4+(r/D.R)*(h-18);
+    x.strokeStyle="#5b544b"; x.beginPath();
+    for(let r=0;r<=D.R;r++){const X=px(D.covF[r]),Y=py(r); r?x.lineTo(X,Y):x.moveTo(X,Y);} x.stroke();
+    x.strokeStyle="#d8a24a"; x.lineWidth=1.8; x.beginPath();
+    for(let r=0;r<=D.R;r++){const X=px(D.covB[r]),Y=py(r); r?x.lineTo(X,Y):x.moveTo(X,Y);} x.stroke();
+    const Yp=py(D.peakRow), Xp=px(D.peakCov);
+    x.strokeStyle="#e0714a"; x.lineWidth=1; x.beginPath(); x.moveTo(pad,Yp); x.lineTo(Xp,Yp); x.stroke();
+    x.fillStyle="#e0714a"; x.beginPath(); x.arc(Xp,Yp,2.6,0,6.2832); x.fill();
+    x.font="9px ui-monospace,monospace";
+    x.fillText("peak "+(D.peakCov*100).toFixed(0)+"%", Math.min(Xp+5,w-52), Yp-3);
+    x.fillStyle="#9a9186";
+    x.fillText("0%",pad-6,h-4); x.fillText("50%",X50-9,h-4); x.fillText("100%",w-26,h-4);
+    for(let m=0;m<=D.H;m+=Math.max(1,Math.round(D.H/5))){
+      const Y=4+(m/D.maxD)*(h-18); if(Y>h-14)break; x.fillText(m+"m",1,Y+3);
+    }
+  });
+  chart("chBulbX",(x,w,h)=>{
+    const B=70, hist=new Int32Array(B);
+    for(const b of D.bulbs) hist[clamp(Math.floor(b[0]/D.W*B),0,B-1)]++;
+    let mx=1; for(const v of hist) mx=Math.max(mx,v);
+    const ideal=D.bulbs.length/B;
+    x.fillStyle="#d8a24a";
+    for(let i=0;i<B;i++){const bh=(hist[i]/mx)*(h-16); x.fillRect(i*w/B, h-12-bh, w/B-0.7, bh);}
+    x.strokeStyle="#7fb3a3"; x.setLineDash([3,3]); x.beginPath();
+    const Y=h-12-(ideal/mx)*(h-16); x.moveTo(0,Y); x.lineTo(w,Y); x.stroke(); x.setLineDash([]);
+    x.fillStyle="#9a9186"; x.font="9px ui-monospace,monospace"; x.fillText("bulb x  (flat = good, combed = bad)",2,h-2);
+  });
+  chart("chBulbY",(x,w,h)=>{
+    const B=70, hist=new Int32Array(B);
+    for(const b of D.bulbs) hist[clamp(Math.floor(b[1]/D.H*B),0,B-1)]++;
+    let mx=1; for(const v of hist) mx=Math.max(mx,v);
+    x.fillStyle="#7fb3a3";
+    for(let i=0;i<B;i++){const bh=(hist[i]/mx)*(h-16); x.fillRect(i*w/B, h-12-bh, w/B-0.7, bh);}
+    x.fillStyle="#9a9186"; x.font="9px ui-monospace,monospace"; x.fillText("bulb height  (top → floor)",2,h-2);
+  });
+  chart("chLen",(x,w,h)=>{
+    const B=60, hist=new Int32Array(B);
+    const lo=D.minL, hi=D.maxL, sp=Math.max(1e-6,hi-lo);
+    for(const c of D.cab) hist[clamp(Math.floor((c.len-lo)/sp*B),0,B-1)]++;
+    let mx=1; for(const v of hist) mx=Math.max(mx,v);
+    x.fillStyle="#c07a4a";
+    for(let i=0;i<B;i++){const bh=(hist[i]/mx)*(h-16); x.fillRect(i*w/B, h-12-bh, w/B-0.7, bh);}
+    x.fillStyle="#9a9186"; x.font="9px ui-monospace,monospace";
+    x.fillText(fmt(lo,2)+" m",2,h-2); x.fillText(fmt(hi,2)+" m",w-38,h-2);
+  });
+}
+
+/* ═══════════════════════ STATS ═══════════════════════ */
+function row(label,val,cls){return `<div class="stat ${cls||''}"><span>${label}</span><b>${val}</b></div>`;}
+function drawStats(X){ const D0=D; if(X) D=X; try{ drawStatsBody(); } finally { D=D0; } }
+function drawStatsBody(){
+  if(!D)return;
+  const aniso=D.dy/D.colPitch;
+  const bandsTxt=D.layout.seq.filter(b=>!b.mirror).map(b=>b.isCentre?"[centre]":(b.isGround?"·":b.name)).join(" ");
+  document.getElementById("loomStats").innerHTML =
+    (D.gridOn ? row("grid", D.gridCols+" × "+D.R+" cells of "+fmt(D.colPitch*1000,0)+" mm", D.compOverflow?"bad":"good") : "")+
+    (D.compOverflow ? `<p class="note warn">The composition needs ${D.layout.compCols} pairs but the grid has ${D.gridCols}
+       columns — the sett shrank to ${fmt(D.colPitch*1000,0)} mm. Drop a border, a gap, or pairs/col.</p>` : "")+
+    row("pattern pairs across", D.layout.cols+" cols → "+D.S+" strands")+
+    row("sett (pair pitch)", fmt(D.colPitch*1000,0)+" mm","hi")+
+    row("pick pitch", fmt(D.dy*1000,0)+" mm")+
+    row("anisotropy pick : pair", fmt(aniso,1)+" : 1", aniso>1.6&&aniso<3.5?"good":"")+
+    row("cables per strand at beam", D.perStrand+(D.N%D.S?"–"+(D.perStrand+1):""))+
+    (D.gridOn ? row("moves", "orthogonal · ≤ "+D.P.maxStep+" cells per row") : row("one-pair move leans", fmt(Math.atan2(D.colPitch,D.dy)*180/Math.PI,0)+"°"))+
+    (()=>{ const c=D.layout.seq.find(b=>b.isCentre); const seqRows=c.rows.length*c.rs, vis=Math.min(seqRows,D.R+1);
+           return row("centre sequence", seqRows+" picks · "+(seqRows>D.R+1? (D.R+1)+" shown":"fits"), seqRows>D.R+1?"bad":"good"); })()+
+    `<p class="note" style="margin-top:4px">${bandsTxt}${D.P.mirror?" · mirrored":""}</p>`;
+  const perCable = D.cableCross/D.N;
+  const angDeg = D.maxAngle*180/Math.PI;
+  document.getElementById("weaveStats").innerHTML =
+    row("strand crossings", D.crossings.length, D.crossings.length? "good":"bad")+
+    row("cable-level crossings", D.cableCross.toLocaleString())+
+    row("crossings per cable", fmt(perCable,1), perCable>=4?"good":perCable>=1?"":"bad")+
+    row("turns per cable  mean / max", fmt(D.turnsMean,1)+" / "+D.turnsMax, D.turnsMean>=2?"good":"")+
+    (D.gridOn
+      ? row("strand runs along row lines", D.runs+" · "+fmt(D.runLen,0)+" m · mean "+(D.runs?fmt(D.runLen/D.runs*1000,0):"–")+" mm")
+      : row("steepest run from vertical", fmt(angDeg,0)+"°", angDeg>50?"bad":angDeg>38?"":"good"))+
+    row("weft rows", D.weftRows, D.weftRows?"good":"")+
+    row("floats · cables travelling", D.hops.length+" · "+D.weftCables)+
+    row("warp strands floated over", D.weftOver+" ("+D.weftOverCables.toLocaleString()+" cables)")+
+    row("horizontal cable", fmt(D.weftLen,0)+" m · mean run "+(D.hops.length? fmt(D.weftLen/Math.max(1,D.weftCables)*1000,0):"–")+" mm")+
+    row("floats per cable  max / cables never floating", D.floatsMax+" / "+D.neverFloat)+
+    (D.P.weftSpan==="wall" && D.weftRows
+      ? row("full-width ribs", D.ribsFull+" of "+D.weftRows+" weft rows", D.ribsFull===D.weftRows?"good":D.ribsFull?"":"bad")+
+        row("rib thickness  thinnest / mean", fmt(D.ribMinMean,1)+" / "+fmt(D.ribThick,1)+" cables", D.ribMinMean>=2?"good":D.ribMinMean>=1?"":"bad")
+      : "")+
+    row("rib ties (strand crossings tied)", (D.weftOver+D.hops.length).toLocaleString())+
+    (D.crossings.length===0 && !D.hops.length ? `<p class="note warn">Nothing crosses — raise twine above 0.5 or switch the weft on.</p>` : "");
+  let y50=null;
+  for(let r=D.peakRow;r<=D.R;r++){ if(y50===null&&D.covB[r]<=0.5){ y50=r*D.dy; break; } }
+  const readsEverywhere = D.peakCov<=0.5;
+  const topPitch = D.W/D.N*1000;
+  const jamNote = D.jam<=1.15 ? "" : `<p class="note${D.jam>3?" warn":""}">Where a pick gathers a whole band into
+      one pair, a ${fmt(D.binW*1000,0)} mm column carries <b>${fmt(D.jam,1)}×</b> more cable than lies flat
+      (${D.jamBins} such spots) — cables stack roughly ${Math.round(D.jam)} deep there.
+      ${D.jam>3 ? "Too many to tie cleanly: raise pairs/col, widen the band, or spread the chart's dark cells."
+                : "Normal for a loose weave: those are the knots that draw the figure."}</p>`;
+  document.getElementById("covStats").innerHTML =
+    row("top coverage (bundled)", (D.covB[0]*100).toFixed(0)+" %", D.covB[0]>0.6?"bad":"good")+
+    row("if NOT bundled", (D.covF[0]*100).toFixed(0)+" %", D.covF[0]>0.6?"bad":"")+
+    row("peak coverage", (D.peakCov*100).toFixed(0)+" % @ "+fmt(D.peakRow*D.dy,2)+" m", D.peakCov>0.55?"bad":"good")+
+    row("reads as pattern", readsEverywhere? "everywhere":(y50===null?"never":"below "+fmt(y50,2)+" m"),
+        readsEverywhere?"good":(y50===null||y50>D.H*0.5?"bad":""))+
+    row("cable pitch at beam", fmt(topPitch,1)+" mm "+(topPitch<D.dia?"⚠":""), topPitch<D.dia?"bad":"")+
+    row("tightest pinch", fmt(D.jam,1)+"× deep @ "+fmt(D.jamX,1)+","+fmt(D.jamY,1)+" m", D.jam>3?"bad":D.jam>2?"":"good")+
+    row("tie rows / spacing", D.R+" @ "+fmt(D.dy*1000,0)+" mm")+jamNote;
+  document.getElementById("bulbStats").innerHTML =
+    row("bulbs", D.bulbs.length)+
+    row("ideal even spacing", fmt(D.rTarget*1000,0)+" mm")+
+    row("mean nearest neighbour", fmt(D.nnMean*1000,0)+" mm", D.nnMean>D.rTarget*0.62?"good":"bad")+
+    row("closest pair", fmt(D.nnMin*1000,0)+" mm", D.nnMin>0.05?"good":"bad")+
+    row("cluster CV (0 = perfect)", fmt(D.cv,2), D.cv<0.35?"good":D.cv<0.55?"":"bad")+
+    row("per 0.5 m slice", D.sliceLo+" – "+D.sliceHi+" bulbs")+
+    row("vertical evenness CV", fmt(D.sliceCV,2), D.sliceCV<0.15?"good":D.sliceCV<0.28?"":"bad");
+  document.getElementById("lenStats").innerHTML =
+    row("cut length min / mean / max", fmt(D.minL,2)+" / "+fmt(D.meanL,2)+" / "+fmt(D.maxL,2)+" m")+
+    row("total cable", fmt(D.totLen,0)+" m","hi")+
+    row("longest = order roll of", fmt(Math.ceil(D.maxL*10)/10,1)+" m", D.maxL > D.H*1.3 ? "bad" : "");
+  const cableKg = D.totLen*D.P.gpm/1000;
+  const bulbKg  = D.N*D.P.bulbMass/1000;
+  const perM    = (cableKg+bulbKg)/D.W;
+  const maxLatN = Math.abs(D.maxLat);
+  let netLat=0, maxRowLat=0;
+  for(let r=0;r<=D.R;r++){netLat+=D.rowLat[r]; maxRowLat=Math.max(maxRowLat,Math.abs(D.rowLat[r]));}
+  document.getElementById("loadStats").innerHTML =
+    row("cable mass", fmt(cableKg,0)+" kg")+
+    row("bulbs + sockets", fmt(bulbKg,0)+" kg")+
+    row("total hanging", fmt(cableKg+bulbKg,0)+" kg","hi")+
+    row("load per m of beam", fmt(perM,1)+" kg/m", perM>60?"bad":"good")+
+    row("per top anchor", fmt((cableKg+bulbKg)/D.N*1000,0)+" g")+
+    row("max lateral pull at one tie", fmt(maxLatN,1)+" N", maxLatN>60?"bad":"good")+
+    row("worst row lateral net", fmt(maxRowLat,0)+" N")+
+    row("whole-piece lateral net", fmt(netLat,0)+" N", Math.abs(netLat)<40?"good":"bad");
+  document.getElementById("loadNote").innerHTML = Math.abs(netLat)<40
+    ? "Lateral forces balance — the composition is symmetric enough to stand without edge restraint."
+    : `Net <b>${fmt(Math.abs(netLat),0)} N</b> pulls ${netLat>0?"right":"left"}. An asymmetric composition drags the whole net sideways: restrain the ${netLat>0?"right":"left"} edge, or switch mirroring on.`;
+  document.getElementById("genTime").textContent =
+    `${D.N} cables · ${D.S} strands · ${D.layout.cols} pairs · ${D.crossings.length} crossings · ${fmt(D.ms,0)} ms`;
+}
+
+/* ═══════════════════════ UI ═══════════════════════ */
+const SLIDERS = [
+  ["width",v=>fmt(v,1)+" m"],["height",v=>fmt(v,1)+" m"],["count",v=>v|0],
+  ["dia",v=>fmt(v,1)],["gpm",v=>v|0],["bulbMass",v=>(v|0)+" g"],
+  ["gridPitch",v=>fmt(v*1000,0)+" mm"],["maxStep",v=>(v|0)+" cells"],["laneOff",v=>fmt(v*1000,0)+" mm"],
+  ["rows",v=>v|0],["maxDepth",v=>fmt(v,1)+" m"],["margin",v=>fmt(v*1000,0)+" mm"],
+  ["rowScale",v=>(v|0)],["maxAng",v=>(v|0)+"°"],["snap",v=>v?(v|0)+" mm":"off"],["pack",v=>fmt(v,2)],
+  ["twine",v=>fmt(v,2)],["twinePer",v=>v|0],
+  ["weftEvery",v=>v?(v|0)+" picks":"off"],["weftPhase",v=>v|0],["weftFloat",v=>(v|0)+" cells"],["weftStep",v=>(v|0)+" cells"],["weftJitter",v=>fmt(v,2)],
+  ["weftHops",v=>v|0],["weftMax",v=>v|0],["weftSag",v=>fmt(v*1000,0)+" mm"],
+  ["shedGamma",v=>fmt(v,2)],["tailFactor",v=>fmt(v,1)],["bnTries",v=>v|0],
+  ["minGap",v=>(v|0)+" mm"],["topClear",v=>fmt(v,2)+" m"],
+];
+function syncInputs(){
+  for(const [k,f] of SLIDERS){
+    const el=document.getElementById(k); if(!el)continue;
+    el.value=P[k]; el.parentElement.querySelector(".val").textContent=f(P[k]);
+  }
+  document.getElementById("seed").value=P.seed;
+  document.getElementById("mirror").checked=!!P.mirror;
+  document.getElementById("grid").checked=!!P.grid;
+  document.getElementById("rows").disabled=!!P.grid;
+  ["maxAng","snap"].forEach(id=>document.getElementById(id).disabled=!!P.grid);
+  { const cols=Math.max(2,Math.round((P.width-2*P.margin)/P.gridPitch)), rows=Math.max(4,Math.round(Math.min(P.maxDepth,P.height)/P.gridPitch));
+    const per=P.count/cols;
+    document.getElementById("gridNote").innerHTML = P.grid
+      ? `${P.count} cables over ${fmt(P.width,1)} m is a ${fmt(P.width/P.count*1000,1)} mm pitch — a curtain. On a
+         <b>${fmt(P.gridPitch*1000,0)} mm</b> grid the wall is <b>${cols} × ${rows}</b> cells: ${cols} strands of
+         <b>${per.toFixed(1)}</b> cables each (Ø≈${fmt(P.dia*Math.sqrt(per/0.9),0)} mm). Every move is a column or a row of
+         this grid: down, along the row line, down again. Tie rows, max angle and snap are set by the grid.`
+      : "Free mode: strands lean diagonally between tie rows, bounded by max angle."; }
+  document.getElementById("weftSpan").value=P.weftSpan||"wall";
+  { const f=P.weftFloat|0, st=Math.max(1,P.weftStep|0), th=(f/st*Math.max(1,P.weftHops|0));
+    document.getElementById("ribNote").innerHTML = !P.weftEvery ? "weft off" :
+      st<f ? `runs overlap: a <b>continuous rib</b> about <b>${th.toFixed(1)} cables thick</b>, each cable covering ${f} cells and handing over every ${st}`
+           : st===f ? "runs meet end to end: one thread across, no overlap (a gap where a run is short)"
+           : "runs are shorter than their spacing: separate floats, not a rib"; }
+  document.getElementById("cGap").value=P.centre.gap; document.getElementById("cDup").value=P.centre.dup;
+  document.getElementById("cRowScale").value=P.centre.rowScale||1;
+  document.getElementById("cFit").checked=!!P.centre.fit;
+  document.getElementById("blur").value=blurPx;
+  document.getElementById("blur").parentElement.querySelector(".val").textContent=fmt(blurPx,1);
+  document.getElementById("gain").value=gain;
+  document.getElementById("gain").parentElement.querySelector(".val").textContent=fmt(gain,1);
+}
+/* tiny chart preview of a motif */
+function miniChart(rows,scalePx){
+  const k=rows[0].length, h=rows.length, c=document.createElement("canvas");
+  c.width=k*scalePx; c.height=h*scalePx; c.className="mini";
+  c.style.width=(k*scalePx)+"px"; c.style.height=(h*scalePx)+"px";
+  const x=c.getContext("2d"); x.fillStyle="#f2ede4"; x.fillRect(0,0,c.width,c.height); x.fillStyle="#0d0b09";
+  rows.forEach((s,j)=>{ for(let i=0;i<k;i++) if(s[i]==="1") x.fillRect(i*scalePx,j*scalePx,scalePx,scalePx); });
+  return c;
+}
+function buildBorders(){
+  const host=document.getElementById("borders"); host.innerHTML="";
+  P.borders.forEach((b,i)=>{
+    const d=document.createElement("div"); d.className="band";
+    d.innerHTML=`
+      <div class="bhead">
+        <select data-f="motif">${LEX_KEYS.map(k=>`<option value="${k}"${k===b.motif?" selected":""}>${LEX[k].label}</option>`).join("")}</select>
+        <button data-a="up" title="move outward">▲</button>
+        <button data-a="dn" title="move inward">▼</button>
+        <button data-a="rm" title="remove">✕</button>
+      </div>
+      <div class="grid">
+        <label>pairs/col<input type="number" data-f="dup" min="1" max="4" step="1" value="${b.dup}"></label>
+        <label>ground after<input type="number" data-f="gap" min="0" max="8" step="1" value="${b.gap}"></label>
+        <label>phase<input type="number" data-f="phase" min="0" max="12" step="1" value="${b.phase|0}"></label>
+      </div>`;
+    const m=LEX[b.motif]||LEX.stripe;
+    d.querySelector(".bhead").insertBefore(miniChart(m.rows,4), d.querySelector('[data-a="up"]'));
+    d.querySelectorAll("[data-f]").forEach(el=>{
+      el.addEventListener("input",()=>{ const f=el.dataset.f; P.borders[i][f]= f==="motif"? el.value : parseInt(el.value)||0; regen(); if(f==="motif") buildBorders(); });
+    });
+    d.querySelectorAll("[data-a]").forEach(el=>{
+      el.addEventListener("click",()=>{
+        const a=el.dataset.a;
+        if(a==="rm"&&P.borders.length>0) P.borders.splice(i,1);
+        if(a==="up"&&i>0) P.borders.splice(i-1,0,P.borders.splice(i,1)[0]);
+        if(a==="dn"&&i<P.borders.length-1) P.borders.splice(i+1,0,P.borders.splice(i,1)[0]);
+        buildBorders(); regen();
+      });
+    });
+    host.appendChild(d);
+  });
+  buildGlyphs();
+}
+function buildGlyphs(){
+  const host=document.getElementById("glyphs"); host.innerHTML="";
+  P.centre.glyphs.forEach((g,i)=>{
+    const d=document.createElement("div"); d.className="g";
+    d.innerHTML=`<select>${GLYPH_KEYS.map(k=>`<option value="${k}"${k===g?" selected":""}>${GLYPHS[k].label}</option>`).join("")}</select>
+      <button data-a="up">▲</button><button data-a="dn">▼</button><button data-a="rm">✕</button>`;
+    d.insertBefore(miniChart((GLYPHS[g]||GLYPHS.bigDiamond).rows,2), d.querySelector('[data-a="up"]'));
+    d.querySelector("select").addEventListener("input",e=>{ P.centre.glyphs[i]=e.target.value; buildGlyphs(); regen(); });
+    d.querySelectorAll("[data-a]").forEach(el=>el.addEventListener("click",()=>{
+      const a=el.dataset.a, Gl=P.centre.glyphs;
+      if(a==="rm"&&Gl.length>1) Gl.splice(i,1);
+      if(a==="up"&&i>0) Gl.splice(i-1,0,Gl.splice(i,1)[0]);
+      if(a==="dn"&&i<Gl.length-1) Gl.splice(i+1,0,Gl.splice(i,1)[0]);
+      buildGlyphs(); regen();
+    }));
+    host.appendChild(d);
+  });
+}
+let pending=null;
+function regen(immediate){
+  if(pending) cancelAnimationFrame(pending);
+  const run=()=>{ D=generate(P); draw(); drawCharts(); drawStats(); pending=null;
+                  if(typeof mode!=="undefined" && mode==="evolve") scheduleGrid(); };
+  if(immediate) run(); else pending=requestAnimationFrame(run);
+}
+for(const [k,f] of SLIDERS){
+  const el=document.getElementById(k); if(!el)continue;
+  el.addEventListener("input",()=>{
+    P[k]=parseFloat(el.value);
+    if(k==="height") P.maxDepth=Math.min(P.maxDepth,P.height);
+    if(k==="maxDepth") P.maxDepth=Math.min(P.maxDepth,P.height);
+    el.parentElement.querySelector(".val").textContent=f(P[k]);
+    regen();
+  });
+}
+document.getElementById("mirror").addEventListener("change",e=>{ P.mirror=e.target.checked; regen(); });
+document.getElementById("grid").addEventListener("change",e=>{ P.grid=e.target.checked; syncInputs(); regen(); });
+for(const id of ["gridPitch","maxStep","laneOff"]) document.getElementById(id).addEventListener("input",()=>syncInputs());
+document.getElementById("weftSpan").addEventListener("change",e=>{ P.weftSpan=e.target.value; regen(); });
+for(const id of ["weftFloat","weftStep","weftHops","weftEvery"]) document.getElementById(id).addEventListener("input",()=>syncInputs());
+document.getElementById("cGap").addEventListener("input",e=>{ P.centre.gap=parseInt(e.target.value)||0; regen(); });
+document.getElementById("cDup").addEventListener("input",e=>{ P.centre.dup=Math.max(1,parseInt(e.target.value)||1); regen(); });
+document.getElementById("cRowScale").addEventListener("input",e=>{ P.centre.rowScale=Math.max(1,parseInt(e.target.value)||1); regen(); });
+document.getElementById("cFit").addEventListener("change",e=>{ P.centre.fit=e.target.checked; regen(); });
+document.getElementById("btnAddGlyph").onclick=()=>{ P.centre.glyphs.push(GLYPH_KEYS[Math.floor(Math.random()*GLYPH_KEYS.length)]); buildGlyphs(); regen(); };
+document.getElementById("btnGlyphsAuto").onclick=()=>{ P.centre.glyphs=randomGlyphs(Math.random); buildGlyphs(); regen(); };
+document.getElementById("btnAddBorder").onclick=()=>{ P.borders.push(bd(LEX_KEYS[Math.floor(Math.random()*LEX_KEYS.length)],1,1)); buildBorders(); regen(); };
+document.getElementById("seed").addEventListener("input",e=>{P.seed=parseInt(e.target.value)||0;regen();});
+function randomGlyphs(R){ const n=1+Math.floor(R()*4); const g=[]; for(let i=0;i<n;i++) g.push(GLYPH_KEYS[Math.floor(R()*GLYPH_KEYS.length)]); return g; }
+function randomComposition(R){
+  const nb=2+Math.floor(R()*4); const borders=[];
+  for(let i=0;i<nb;i++) borders.push(bd(LEX_KEYS[Math.floor(R()*LEX_KEYS.length)], R()<0.75?1:2+Math.floor(R()*2), R()<0.2?0:1+Math.floor(R()*3), Math.floor(R()*4)));
+  const centre={glyphs:randomGlyphs(R), gap:1+Math.floor(R()*5), dup:1+Math.floor(R()*3), rowScale:R()<0.7?1:2, fit:R()<0.8};
+  return {borders,centre};
+}
+document.getElementById("btnRand").onclick=()=>{P.seed=(Math.random()*1e9)|0;currentFavId=null;syncInputs();regen(true);logSeen();renderFavs();};
+document.getElementById("btnRandAll").onclick=()=>{
+  /* every DESIGN variable, full range. Wall size, cable count, Ø, g/m and bulb mass are facts and stay. */
+  const R=Math.random, ri=(a,b)=>a+Math.floor(R()*(b-a+1)), rf=(a,b)=>a+R()*(b-a), pick=a=>a[Math.floor(R()*a.length)];
+  P.seed=(R()*1e9)|0;
+  P.grid=R()<0.85; P.gridPitch=+pick([0.08,0.09,0.1,0.1,0.1,0.11,0.125,0.14,0.175]).toFixed(3);
+  P.maxStep=ri(1,4); P.laneOff=+rf(0,0.035).toFixed(4);
+  P.rows=ri(20,50); P.rowScale=pick([1,1,2,2,3]); P.maxAng=ri(30,60); P.snap=0; P.pack=1;
+  P.margin=+pick([0,0,0,0.05,0.1]).toFixed(2);
+  P.twine=R()<0.2?0:+rf(0.5,1.2).toFixed(2); P.twinePer=ri(1,8);
+  P.mirror=R()<0.85;
+  P.shedGamma=+rf(0.5,1.4).toFixed(2); P.tailFactor=+rf(0.3,3).toFixed(1); P.topClear=+pick([0,0.2,0.4,0.4,0.6,1.0]).toFixed(2); P.minGap=ri(0,120);
+  P.weftEvery=R()<0.6?1:(R()<0.1?0:ri(2,6)); P.weftPhase=P.weftEvery>1?ri(0,3):0;
+  P.weftFloat=ri(1,12); P.weftStep=R()<0.5? Math.max(1,Math.round(P.weftFloat*rf(0.25,0.6))) : ri(1,Math.max(1,P.weftFloat));
+  P.weftJitter=R()<0.6?0:+rf(0.1,0.6).toFixed(2); P.weftHops=ri(1,3); P.weftMax=ri(2,8); P.weftSag=+rf(0,0.06).toFixed(3); P.weftSpan=R()<0.75?"wall":"band";
+  const c=randomComposition(R); P.borders=c.borders; P.centre=c.centre;
+  currentFavId=null;
+  syncInputs(); buildBorders(); regen(true); logSeen(); renderFavs();
+};
+const presetSel=document.getElementById("preset");
+presetSel.innerHTML=Object.keys(PRESETS).map(k=>`<option>${k}</option>`).join("");
+presetSel.onchange=()=>{ applyParams(PRESETS[presetSel.value]); currentFavId=null; syncInputs(); buildBorders(); regen(); };
+function applyParams(pr){
+  const src=JSON.parse(JSON.stringify(pr));
+  Object.assign(P, src);
+  P.borders=(src.borders||[]).map(b=>bd(b.motif,b.dup,b.gap,b.phase));
+  P.centre={glyphs:[...((src.centre&&src.centre.glyphs)||["bigDiamond"])], gap:(src.centre&&src.centre.gap)|0,
+            dup:Math.max(1,(src.centre&&src.centre.dup)|0), rowScale:Math.max(1,(src.centre&&src.centre.rowScale)|0),
+            fit: src.centre ? src.centre.fit!==false : true};
+  if(src.weftStep==null){ P.weftStep = src.weftMode==="all" ? 1 : Math.max(1,P.weftFloat|0); }
+  if(src.weftMax==null) P.weftMax=4;
+  P.maxDepth=Math.min(P.maxDepth,P.height);
+}
+document.querySelectorAll("#viewSeg button").forEach(b=>b.onclick=()=>{
+  document.querySelectorAll("#viewSeg button").forEach(x=>x.classList.remove("on"));
+  b.classList.add("on"); view=b.dataset.v; draw();
+});
+document.getElementById("btnPolarity").onclick=()=>{polarity=polarity?0:1;draw();};
+document.getElementById("blur").addEventListener("input",e=>{
+  blurPx=parseFloat(e.target.value);
+  e.target.parentElement.querySelector(".val").textContent=fmt(blurPx,1);
+  if(view!=="density"){document.querySelector('#viewSeg [data-v="density"]').click();} else draw();
+});
+document.getElementById("gain").addEventListener("input",e=>{
+  gain=parseFloat(e.target.value);
+  e.target.parentElement.querySelector(".val").textContent=fmt(gain,1); draw();
+});
+cv.addEventListener("mousemove",e=>{
+  if(!D)return;
+  const Rr=cv.getBoundingClientRect();
+  const x=(e.clientX-Rr.left)/Rr.width*D.W, y=(e.clientY-Rr.top)/Rr.height*D.H;
+  const r=clamp(Math.round(y/D.dy),0,D.R);
+  const band=D.layout.seq.find(b=> x>=D.P.margin+b.c0*D.colPitch && x<D.P.margin+(b.c0+b.cols)*D.colPitch);
+  document.getElementById("hud").textContent=
+    `x ${fmt(x,2)} m   y ${fmt(y,2)} m\nrow ${r} @ ${fmt(r*D.dy,2)} m · ${band? (band.isCentre?"centre":band.name+(band.mirror?" (mirrored)":"")) : "ground gap"}\ncables below: ${D.alive[r]}\ncoverage: ${(D.covB[r]*100).toFixed(0)} %`;
+});
+cv.addEventListener("mouseleave",()=>document.getElementById("hud").textContent="");
+window.addEventListener("resize",()=>{draw();drawCharts();});
+window.addEventListener("keydown",e=>{
+  if(e.target.tagName==="INPUT"||e.target.tagName==="SELECT")return;
+  if(e.key==="r"){document.getElementById("btnRand").click();}
+  if(e.key==="p"){polarity=polarity?0:1;draw();}
+  if(e.key>="1"&&e.key<="4"){document.querySelectorAll("#viewSeg button")[+e.key-1].click();}
+});
+
+/* ═══════════════════════ FAVOURITES ═══════════════════════ */
+const FAV_KEY="saduWeave.favs.v1", SEEN_KEY="saduWeave.seen.v1";
+function lsGet(k,d){ try{ const v=localStorage.getItem(k); return v? JSON.parse(v) : d; }catch(e){ return d; } }
+function lsSet(k,v){ try{ localStorage.setItem(k,JSON.stringify(v)); return true; }catch(e){ return false; } }
+let FAVS = lsGet(FAV_KEY,[]), SEEN = lsGet(SEEN_KEY,[]);
+let currentFavId = null;
+const isLoom = f => !!(f && f.params && f.params.borders && f.params.centre);
+function summaryOf(D){
+  let netLat=0; for(let r=0;r<=D.R;r++) netLat+=D.rowLat[r];
+  return {
+    model:"loom", grid:D.gridOn, gridPitch_mm:D.gridOn?Math.round(D.P.gridPitch*1000):null, strands:D.S, pairs:D.layout.cols, sett_mm:Math.round(D.colPitch*1000),
+    strandCrossings:D.crossings.length, crossingsPerCable:+(D.cableCross/D.N).toFixed(2),
+    weftRows:D.weftRows, weftFloats:D.hops.length, weftCables:D.weftCables, weftOverCables:D.weftOverCables,
+    turnsPerCable:+D.turnsMean.toFixed(2), turnsMax:D.turnsMax, steepestDeg:+(D.maxAngle*180/Math.PI).toFixed(1),
+    topCoverage:+D.covB[0].toFixed(3), peakCoverage:+D.peakCov.toFixed(3), peakAt_m:+(D.peakRow*D.dy).toFixed(2),
+    pinchDepth:+D.jam.toFixed(2),
+    bulbMeanNN_mm:Math.round(D.nnMean*1000), bulbMinNN_mm:Math.round(D.nnMin*1000),
+    bulbClusterCV:+D.cv.toFixed(3), bulbVerticalCV:+D.sliceCV.toFixed(3),
+    cutMin_m:+D.minL.toFixed(2), cutMax_m:+D.maxL.toFixed(2), totalCable_m:Math.round(D.totLen),
+    massTotal_kg:Math.round(D.totLen*D.P.gpm/1000 + D.N*D.P.bulbMass/1000),
+    netLateral_N:Math.round(netLat), maxTieLateral_N:Math.round(Math.abs(D.maxLat)),
+  };
+}
+function thumbOf(D,px){
+  px=px||128;
+  const c=document.createElement("canvas"); c.width=px; c.height=Math.round(px*D.H/D.W);
+  const x=c.getContext("2d"); x.fillStyle="#f2ede4"; x.fillRect(0,0,c.width,c.height);
+  const sc=c.width/D.W;
+  x.strokeStyle="#0d0b09"; x.lineWidth=0.55; x.globalAlpha=0.9; x.beginPath();
+  for(const cb of D.cab){ const p=cb.pts; if(p.length<4)continue;
+    x.moveTo(p[0]*sc,p[1]*sc); for(let i=2;i<p.length;i+=2) x.lineTo(p[i]*sc,p[i+1]*sc); }
+  x.stroke();
+  try{ return c.toDataURL("image/png"); }catch(e){ return ""; }
+}
+function compName(p){ return (p.borders||[]).map(b=>b.motif).join("+")+" | "+(p.centre?p.centre.glyphs.join("+"):""); }
+function favLabelDefault(){ return `#${FAVS.length+1} ${compName(P)} · seed ${P.seed}`; }
+function renderFavs(){
+  if(typeof fillEvFrom==="function") fillEvFrom();
+  const host=document.getElementById("favList");
+  document.getElementById("favCount").textContent = FAVS.length? FAVS.length+" saved" : "";
+  document.getElementById("seenCount").textContent = SEEN.length;
+  host.innerHTML="";
+  [...FAVS].reverse().forEach(f=>{
+    const loom=isLoom(f);
+    const d=document.createElement("div"); d.className="fav"+(f.id===currentFavId?" cur":"")+(loom?"":" old");
+    const sm=f.summary||{};
+    d.innerHTML=`<img src="${f.thumb||''}" alt="">
+      <div><div class="fname" title="${f.name}">${f.name}</div>
+        <div class="fmeta">${loom? `${sm.crossingsPerCable??"–"}×/cable · ${sm.turnsPerCable??"–"} turns · pk ${Math.round((sm.peakCoverage||0)*100)}% · ${sm.massTotal_kg??"–"} kg`
+                                  : "earlier field-model version — view only"}</div>
+        ${f.note?`<div class="fnote" title="${f.note}">${f.note}</div>`:""}</div>
+      <div class="fbtns"><button data-a="load" ${loom?"":"disabled"}>load</button><button data-a="rm" title="remove">✕</button></div>`;
+    d.querySelector('[data-a="load"]').onclick=()=>loadFav(f);
+    d.querySelector('[data-a="rm"]').onclick=()=>{
+      if(!confirm(`Remove "${f.name}"?`)) return;
+      FAVS=FAVS.filter(g=>g.id!==f.id); lsSet(FAV_KEY,FAVS); if(currentFavId===f.id) currentFavId=null; renderFavs(); };
+    if(loom) d.querySelector("img").onclick=()=>loadFav(f);
+    host.appendChild(d);
+  });
+}
+function loadFav(f){
+  if(!isLoom(f)){ alert("That favourite was saved with the earlier field-model version. A copy of that version is in saved designs/v2-field-model/."); return; }
+  applyParams(f.params);
+  currentFavId=f.id;
+  syncInputs(); buildBorders(); regen(true); renderFavs();
+}
+function saveFav(name,note){
+  if(!D) return;
+  const f={ id:Date.now().toString(36)+Math.random().toString(36).slice(2,6), name, note:note||"",
+            savedAt:new Date().toISOString(), params:JSON.parse(JSON.stringify(D.P)),
+            summary:summaryOf(D), thumb:thumbOf(D) };
+  FAVS.push(f); currentFavId=f.id;
+  if(!lsSet(FAV_KEY,FAVS)){
+    FAVS.forEach((g,i)=>{ if(i<FAVS.length-8) g.thumb=""; });
+    if(!lsSet(FAV_KEY,FAVS)) alert("Browser storage is full — export favourites.json to keep them safe.");
+  }
+  renderFavs();
+}
+function logSeen(){
+  if(!D) return;
+  SEEN.push({ at:new Date().toISOString(), params:JSON.parse(JSON.stringify(D.P)), summary:summaryOf(D) });
+  if(SEEN.length>600) SEEN=SEEN.slice(-600);
+  lsSet(SEEN_KEY,SEEN);
+  document.getElementById("seenCount").textContent=SEEN.length;
+}
+const favForm=document.getElementById("favForm");
+document.getElementById("btnFav").onclick=()=>{
+  document.getElementById("favName").value=favLabelDefault();
+  document.getElementById("favNote").value="";
+  favForm.style.display="block"; document.getElementById("favName").focus(); document.getElementById("favName").select();
+};
+document.getElementById("favCancel").onclick=()=>{ favForm.style.display="none"; };
+document.getElementById("favOk").onclick=()=>{
+  const name=document.getElementById("favName").value.trim()||favLabelDefault();
+  saveFav(name, document.getElementById("favNote").value.trim()); favForm.style.display="none";
+};
+for(const id of ["favName","favNote"]) document.getElementById(id).addEventListener("keydown",e=>{
+  if(e.key==="Enter") document.getElementById("favOk").click(); if(e.key==="Escape") favForm.style.display="none"; });
+document.getElementById("favExport").onclick=()=>{
+  dl("sadu_favourites_"+new Date().toISOString().slice(0,10)+".json",
+     JSON.stringify({exportedAt:new Date().toISOString(), app:"sadu-weave", version:3, model:"loom",
+                     favourites:FAVS, seen:SEEN, note:"favourites = liked; seen = every Randomise-all result shown, liked or not"},null,1),
+     "application/json");
+};
+document.getElementById("favImport").onclick=()=>document.getElementById("favFile").click();
+document.getElementById("favFile").addEventListener("change",e=>{
+  const file=e.target.files[0]; if(!file) return;
+  const rd=new FileReader();
+  rd.onload=()=>{
+    try{
+      const j=JSON.parse(rd.result);
+      const inc=Array.isArray(j)? j : (j.favourites||[]);
+      const have=new Set(FAVS.map(f=>f.id)); let n=0;
+      for(const f of inc) if(f&&f.params&&!have.has(f.id)){ FAVS.push(f); n++; }
+      if(Array.isArray(j.seen)){ const seenKeys=new Set(SEEN.map(s=>s.at)); for(const s of j.seen) if(!seenKeys.has(s.at)) SEEN.push(s); lsSet(SEEN_KEY,SEEN); }
+      lsSet(FAV_KEY,FAVS); renderFavs();
+      alert(`Imported ${n} favourite${n===1?"":"s"}.`);
+    }catch(err){ alert("Could not read that file: "+err.message); }
+    e.target.value="";
+  };
+  rd.readAsText(file);
+});
+window.addEventListener("keydown",e=>{
+  if(e.target.tagName==="INPUT"||e.target.tagName==="SELECT")return;
+  if(e.key==="s"||e.key==="S"){ document.getElementById("btnFav").click(); }
+});
+
+/* ═══════════════════════ EVOLVE ═══════════════════════
+   Interactive evolution on a 2-D map. Centre tile = the parent (P). The grid's
+   two axes are the two principal directions along which the saved favourites
+   differ (PCA of normalised parameter vectors). Ring distance = mutation size.
+   Clicking a tile saves it as a favourite and re-centres the map on it.  */
+let mode="design";
+const EV = { S:0.7, G:5, gen:0, parentName:"current design", hist:[], noise:1, tiles:[], axes:null, hover:null };
+const GENES=[["rows",16,50,1],["shedGamma",0.4,2.0,0],["tailFactor",0,4,0],["maxAng",25,65,1],["topClear",0,1.5,0],
+  ["rowScale",1,3,1],["twine",0,1.1,0],["twinePer",1,10,1],
+  ["weftEvery",0,8,1],["weftPhase",0,7,1],["weftFloat",1,12,1],["weftStep",1,8,1],["weftJitter",0,1,0],["weftHops",1,3,1],["weftSag",0,0.12,0],
+  ["maxStep",1,5,1],["laneOff",0,0.04,0],["gridPitch",0.08,0.2,0],["weftMax",2,8,1]];
+const CGENES=[["gap",0,8,1],["dup",1,3,1],["rowScale",1,3,1]];
+const BGENES=[["dup",1,3,1],["gap",0,5,1],["phase",0,8,1]];
+const MAXB=6, NDIM=GENES.length+CGENES.length+MAXB*BGENES.length;
+function vecOf(p){
+  const v=[];
+  for(const [k,lo,hi] of GENES) v.push(clamp(((p[k]??lo)-lo)/(hi-lo),0,1));
+  for(const [k,lo,hi] of CGENES) v.push(clamp((((p.centre||{})[k]??lo)-lo)/(hi-lo),0,1));
+  const nb=Math.max(1,(p.borders||[]).length);
+  for(let i=0;i<MAXB;i++){ const b=(p.borders||[])[Math.min(i,nb-1)]||{};
+    for(const [k,lo,hi] of BGENES) v.push(clamp(((b[k]??lo)-lo)/(hi-lo),0,1)); }
+  return v;
+}
+function geneName(i){
+  if(i<GENES.length) return GENES[i][0];
+  i-=GENES.length; if(i<CGENES.length) return "centre."+CGENES[i][0];
+  i-=CGENES.length; return "border"+(Math.floor(i/BGENES.length)+1)+"."+BGENES[i%BGENES.length][0];
+}
+function applyVec(p,v){
+  let i=0;
+  for(const [k,lo,hi,int] of GENES){ let x=lo+clamp(v[i++],0,1)*(hi-lo); if(int) x=Math.round(x); p[k]=x; }
+  for(const [k,lo,hi,int] of CGENES){ let x=lo+clamp(v[i++],0,1)*(hi-lo); if(int) x=Math.round(x); p.centre[k]=x; }
+  for(let bi=0;bi<MAXB;bi++) for(const [k,lo,hi,int] of BGENES){
+    let x=lo+clamp(v[i++],0,1)*(hi-lo); if(int) x=Math.round(x); if(bi<p.borders.length) p.borders[bi][k]=x; }
+  p.maxDepth=Math.min(p.maxDepth,p.height);
+  p.twinePer=Math.max(1,p.twinePer|0); p.rowScale=Math.max(1,p.rowScale|0);
+  p.centre.dup=Math.max(1,p.centre.dup|0); p.centre.rowScale=Math.max(1,p.centre.rowScale|0);
+  for(const b of p.borders){ b.dup=Math.max(1,b.dup|0); b.gap=Math.max(0,b.gap|0); b.phase=Math.max(0,b.phase|0); }
+  return p;
+}
+function pca2(vectors){
+  const n=vectors.length, d=NDIM;
+  const mean=new Array(d).fill(0); for(const v of vectors) for(let i=0;i<d;i++) mean[i]+=v[i]/n;
+  const X=vectors.map(v=>v.map((x,i)=>x-mean[i]));
+  const C=Array.from({length:d},()=>new Float64Array(d));
+  for(const x of X) for(let i=0;i<d;i++){ if(!x[i])continue; for(let j=0;j<d;j++) C[i][j]+=x[i]*x[j]/n; }
+  const comps=[];
+  for(let c=0;c<2;c++){
+    let v=new Array(d).fill(0).map((_,i)=>Math.sin(i*1.7+c*0.9)+0.1);
+    for(let it=0;it<300;it++){
+      const w=new Array(d).fill(0);
+      for(let i=0;i<d;i++){ let sm=0; const Ci=C[i]; for(let j=0;j<d;j++) sm+=Ci[j]*v[j]; w[i]=sm; }
+      for(const u of comps){ let dot=0; for(let i=0;i<d;i++) dot+=w[i]*u[i]; for(let i=0;i<d;i++) w[i]-=dot*u[i]; }
+      let nrm=0; for(const x of w) nrm+=x*x; nrm=Math.sqrt(nrm); if(nrm<1e-12) break;
+      v=w.map(x=>x/nrm);
+    }
+    comps.push(v);
+  }
+  return comps;
+}
+function defaultAxes(){
+  /* no favourites yet: → twining, ↓ scale of the figure */
+  const a=new Array(NDIM).fill(0), b=new Array(NDIM).fill(0);
+  a[6]=1; a[7]=-0.5;
+  b[5]=1; b[GENES.length+1]=0.8; b[GENES.length+2]=0.6;
+  const nz=v=>{ const n=Math.hypot(...v)||1; return v.map(x=>x/n); };
+  return [nz(a),nz(b)];
+}
+function computeAxes(){
+  const vs=FAVS.filter(isLoom).map(f=>vecOf(f.params));
+  EV.axes = vs.length>=3 ? pca2(vs) : defaultAxes();
+  EV.axesFrom = vs.length>=3 ? vs.length+" favourites" : "defaults";
+  const label=(u)=>{
+    const idx=u.map((x,i)=>[Math.abs(x),i]).sort((p,q)=>q[0]-p[0]).slice(0,3).filter(t=>t[0]>0.12);
+    return idx.map(([a,i])=>(u[i]>0?"+":"−")+geneName(i)).join("  ");
+  };
+  document.getElementById("evAxX").innerHTML="→ <b>"+label(EV.axes[0])+"</b>";
+  document.getElementById("evAxY").innerHTML="↓ <b>"+label(EV.axes[1])+"</b> &nbsp;·&nbsp; axes from "+EV.axesFrom;
+}
+function gauss(rng){ let u=0,v=0; while(u===0)u=rng(); while(v===0)v=rng(); return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v); }
+function mutant(i,j){
+  const Gn=EV.G, c=(Gn-1)/2, S=EV.S;
+  const parent=JSON.parse(JSON.stringify(P));
+  if(i===c && j===c) return parent;
+  const rng=mulberry32((EV.noise*7919 + i*131 + j*17 + EV.gen*100003)>>>0);
+  const ring=Math.max(Math.abs(i-c),Math.abs(j-c))/c;
+  const v=vecOf(parent);
+  const ax=(i-c)/c*S*0.9, ay=(j-c)/c*S*0.9;
+  for(let k=0;k<NDIM;k++) v[k]+= ax*EV.axes[0][k] + ay*EV.axes[1][k] + gauss(rng)*S*0.22*ring;
+  applyVec(parent,v);
+  /* structure: motifs, glyphs, band count, mirroring — jumps, not drifts */
+  const pMotif=S*0.35*ring, pGlyph=S*0.35*ring, pBands=S*0.22*ring;
+  for(const b of parent.borders) if(rng()<pMotif) b.motif=LEX_KEYS[Math.floor(rng()*LEX_KEYS.length)];
+  const gl=parent.centre.glyphs;
+  for(let k=0;k<gl.length;k++) if(rng()<pGlyph) gl[k]=GLYPH_KEYS[Math.floor(rng()*GLYPH_KEYS.length)];
+  if(rng()<pGlyph*0.6){ if(gl.length>1 && rng()<0.5) gl.splice(Math.floor(rng()*gl.length),1); else if(gl.length<6) gl.splice(Math.floor(rng()*(gl.length+1)),0,GLYPH_KEYS[Math.floor(rng()*GLYPH_KEYS.length)]); }
+  if(rng()<pBands){
+    if(parent.borders.length>1 && rng()<0.5) parent.borders.splice(Math.floor(rng()*parent.borders.length),1);
+    else if(parent.borders.length<MAXB) parent.borders.splice(Math.floor(rng()*(parent.borders.length+1)),0,
+      bd(LEX_KEYS[Math.floor(rng()*LEX_KEYS.length)],1+Math.floor(rng()*2),Math.floor(rng()*3),Math.floor(rng()*4)));
+  }
+  if(rng()<pBands*0.6 && parent.borders.length>1){
+    const a=Math.floor(rng()*parent.borders.length), b2=Math.floor(rng()*parent.borders.length);
+    [parent.borders[a],parent.borders[b2]]=[parent.borders[b2],parent.borders[a]];
+  }
+  if(rng()<S*0.06*ring) parent.mirror=!parent.mirror;
+  if(rng()<S*0.08*ring) parent.centre.fit=!parent.centre.fit;
+  if(rng()<S*0.10*ring) parent.weftSpan = parent.weftSpan==="wall" ? "band" : "wall";
+  if(rng()<S*0.05*ring) parent.grid = !parent.grid;
+  parent.seed=(rng()*1e9)|0;
+  return applyVec(parent, vecOf(parent));
+}
+let gridTimer=null;
+function scheduleGrid(){ if(gridTimer) clearTimeout(gridTimer); gridTimer=setTimeout(buildGrid,220); }
+function tileCaption(Dx){ return `${Dx.S}s · ${(Dx.cableCross/Dx.N).toFixed(0)}×/c · pk${Math.round(Dx.peakCov*100)}% · ${Dx.jam.toFixed(1)}× · ${Math.round(Dx.totLen*Dx.P.gpm/1000+Dx.N*Dx.P.bulbMass/1000)}kg`; }
+function drawTile(t){
+  const c=t.canvas, Dx=t.D, dpr=Math.min(2,window.devicePixelRatio||1);
+  const w=c.clientWidth||160, h=c.clientHeight||160;
+  c.width=Math.round(w*dpr); c.height=Math.round(h*dpr);
+  const x=c.getContext("2d"); x.fillStyle="#f2ede4"; x.fillRect(0,0,c.width,c.height);
+  const sc=Math.min(c.width/Dx.W, c.height/Dx.H);
+  const ox=(c.width-Dx.W*sc)/2, oy=(c.height-Dx.H*sc)/2;
+  x.strokeStyle="#0d0b09"; x.lineWidth=Math.max(0.45, Dx.dia*sc*1.6); x.globalAlpha=0.9;
+  x.lineJoin="round"; x.beginPath();
+  for(const cb of Dx.cab){ const p=cb.pts; if(p.length<4)continue;
+    x.moveTo(ox+p[0]*sc,oy+p[1]*sc); for(let i=2;i<p.length;i+=2) x.lineTo(ox+p[i]*sc,oy+p[i+1]*sc); }
+  x.stroke(); x.globalAlpha=1;
+  x.fillStyle="#c8892a"; x.beginPath(); const r=Math.max(0.8,0.012*sc);
+  for(const b of Dx.bulbs){ x.moveTo(ox+b[0]*sc+r,oy+b[1]*sc); x.arc(ox+b[0]*sc,oy+b[1]*sc,r,0,6.2832); }
+  x.fill();
+}
+let buildToken=0;
+function buildGrid(){
+  if(mode!=="evolve") return;
+  computeAxes();
+  const Gn=EV.G, c=(Gn-1)/2, host=document.getElementById("evGrid");
+  const wrap=document.getElementById("evolveWrap");
+  const availW=(wrap.clientWidth||900)-28, availH=(wrap.clientHeight||700)-110;
+  const size=Math.max(80, Math.floor(Math.min((availW-(Gn-1)*6)/Gn, (availH-(Gn-1)*6)/Gn)));
+  host.style.gridTemplateColumns=`repeat(${Gn}, ${size}px)`;
+  host.style.gridTemplateRows=`repeat(${Gn}, ${size}px)`;
+  host.innerHTML=""; EV.tiles=[];
+  const token=++buildToken;
+  for(let j=0;j<Gn;j++) for(let i=0;i<Gn;i++){
+    const t={i,j,params:mutant(i,j),D:null,canvas:document.createElement("canvas"),el:document.createElement("div")};
+    t.el.className="tile"+(i===c&&j===c?" parent":"");
+    t.el.appendChild(t.canvas);
+    const busy=document.createElement("div"); busy.className="busy"; busy.textContent="…"; t.el.appendChild(busy);
+    if(i===c&&j===c){ const tag=document.createElement("div"); tag.className="tag"; tag.textContent="parent · gen "+EV.gen; t.el.appendChild(tag); }
+    const cap=document.createElement("div"); cap.className="cap"; t.el.appendChild(cap); t.cap=cap; t.busy=busy;
+    t.el.onclick=()=>{ if(!t.D) return; if(i===c&&j===c) return; adopt(t); };
+    t.el.onmouseenter=()=>{ if(t.D){ EV.hover=t; drawStats(t.D); drawCharts(t.D); } };
+    t.el.onmouseleave=()=>{ EV.hover=null; drawStats(); drawCharts(); };
+    host.appendChild(t.el); EV.tiles.push(t);
+  }
+  const order=[...EV.tiles].sort((a,b)=>(Math.abs(a.i-c)+Math.abs(a.j-c))-(Math.abs(b.i-c)+Math.abs(b.j-c)));
+  let q=0;
+  const step=()=>{
+    if(token!==buildToken) return;
+    const t=order[q++]; if(!t) return;
+    t.D = (t.i===c&&t.j===c && D) ? D : generate(t.params);
+    drawTile(t); t.busy.remove(); t.cap.textContent=tileCaption(t.D);
+    requestAnimationFrame(step);
+  };
+  requestAnimationFrame(step);
+  document.getElementById("evCrumbs").innerHTML=`gen <b>${EV.gen}</b> · parent: <b>${EV.parentName}</b>` + (EV.hist.length?` · ${EV.hist.length} back`:"");
+  document.getElementById("evBack").disabled=!EV.hist.length;
+}
+function adopt(t){
+  EV.hist.push({params:JSON.parse(JSON.stringify(P)), name:EV.parentName, gen:EV.gen});
+  const prevName=EV.parentName;
+  applyParams(t.params);
+  EV.gen++;
+  D=generate(P);
+  const name=`gen ${EV.gen} · ${compName(P)} · seed ${P.seed}`;
+  saveFav(name, `evolved from “${prevName}”`);
+  EV.parentName=name; EV.noise++;
+  syncInputs(); buildBorders(); drawCharts(); drawStats(); buildGrid();
+}
+function setMode(m){
+  mode=m;
+  document.querySelectorAll("#modeSeg button").forEach(b=>b.classList.toggle("on",b.dataset.m===m));
+  const ev=m==="evolve";
+  document.getElementById("evolveWrap").classList.toggle("on",ev);
+  document.getElementById("view").style.visibility=ev?"hidden":"visible";
+  document.getElementById("hud").style.display=ev?"none":"";
+  ["viewSeg","btnPolarity"].forEach(id=>document.getElementById(id).style.display=ev?"none":"");
+  document.getElementById("blur").parentElement.style.display=ev?"none":"";
+  document.getElementById("gain").parentElement.style.display=ev?"none":"";
+  if(ev){
+    const f=FAVS.find(g=>g.id===currentFavId);
+    EV.parentName = f? f.name : "current design";
+    fillEvFrom(); buildGrid();
+  } else { draw(); }
+}
+function fillEvFrom(){
+  const sel=document.getElementById("evFrom");
+  sel.innerHTML='<option value="">start from favourite…</option>'+[...FAVS].reverse().filter(isLoom).map(f=>`<option value="${f.id}">${f.name}</option>`).join("");
+}
+document.querySelectorAll("#modeSeg button").forEach(b=>b.onclick=()=>setMode(b.dataset.m));
+document.getElementById("evStep").addEventListener("input",e=>{ EV.S=parseFloat(e.target.value);
+  e.target.parentElement.querySelector(".val").textContent=EV.S.toFixed(2); scheduleGrid(); });
+document.getElementById("evGridN").onchange=e=>{ EV.G=parseInt(e.target.value); buildGrid(); };
+document.getElementById("evReroll").onclick=()=>{ EV.noise++; buildGrid(); };
+document.getElementById("evBack").onclick=()=>{
+  const h=EV.hist.pop(); if(!h) return;
+  applyParams(h.params); EV.parentName=h.name; EV.gen=h.gen;
+  D=generate(P); syncInputs(); buildBorders(); drawCharts(); drawStats(); buildGrid();
+};
+document.getElementById("evOpen").onclick=()=>setMode("design");
+document.getElementById("evFrom").onchange=e=>{
+  const f=FAVS.find(g=>g.id===e.target.value); if(!f) return;
+  EV.hist=[]; EV.gen=0; loadFav(f); EV.parentName=f.name; buildGrid();
+};
+window.addEventListener("resize",()=>{ if(mode==="evolve") scheduleGrid(); });
+
+/* ═══════════════════════ EXPORT ═══════════════════════ */
+function dl(name,text,mime){
+  const b=new Blob([text],{type:mime||"text/plain;charset=utf-8"});
+  const u=URL.createObjectURL(b), a=document.createElement("a");
+  a.href=u; a.download=name; document.body.appendChild(a); a.click();
+  setTimeout(()=>{URL.revokeObjectURL(u);a.remove();},400);
+}
+const stamp=()=>`sadu_${D.P.seed}`;
+const bandLabel=nd=> nd.band.isCentre?"centre":nd.band.name+(nd.band.mirror?"'":"");
+document.getElementById("exCables").onclick=()=>{
+  const L=["cable_id,anchor_index,anchor_x_mm,strand_id,band,path_points,turns,weft_floats,horizontal_mm,shed_row,shed_y_mm,tail_mm,bulb_x_mm,bulb_y_mm,path_len_mm,cut_len_mm,mass_g,waypoints_x_mm"];
+  const nodeBand={}; for(const nd of D.nodes) nodeBand[nd.id]=bandLabel(nd);
+  for(const c of D.cab){
+    const wp=[]; for(let i=0;i<c.pts.length;i+=2) wp.push(Math.round(c.pts[i]*1000));
+    const mass=c.len*D.P.gpm + D.P.bulbMass;
+    L.push([c.id,c.id,Math.round(c.anchorX*1000),c.node,nodeBand[c.node]||"",c.pts.length/2,c.turns,c.floats,Math.round(c.hlen*1000),c.shedRow,
+            Math.round(c.shedRow*D.dy*1000),Math.round(c.tail*1000),
+            Math.round(c.bx*1000),Math.round(c.by*1000),
+            Math.round((c.len-c.tail)*1000),Math.round(c.len*1000),
+            Math.round(mass),'"'+wp.join(" ")+'"'].join(","));
+  }
+  dl(stamp()+"_cables.csv",L.join("\n"),"text/csv");
+};
+document.getElementById("exBulbs").onclick=()=>{
+  const L=["bulb_id,cable_id,x_mm,y_mm,height_above_floor_mm,nearest_neighbour_mm"];
+  D.bulbs.forEach((b,i)=>L.push([i,b[2],Math.round(b[0]*1000),Math.round(b[1]*1000),
+      Math.round((D.H-b[1])*1000),Math.round(D.nn[i]*1000)].join(",")));
+  dl(stamp()+"_bulbs.csv",L.join("\n"),"text/csv");
+};
+document.getElementById("exTies").onclick=()=>{
+  const L=["row,y_mm,strand_id,band,pair_col,x_mm,cables_in_strand,strand_dia_mm,tension_N,lateral_N"];
+  for(const nd of D.nodes) for(let i=0;i<nd.path.length;i++){
+    const r=nd.birth+i;
+    L.push([r,Math.round(r*D.dy*1000),nd.id,bandLabel(nd),nd.band.c0+nd.c,
+            Math.round(nd.path[i]*1000),nd.count[i],Math.round(D.bw(nd.count[i])*1000),
+            (nd.T[i]||0).toFixed(1),(nd.lat[i]||0).toFixed(1)].join(","));
+  }
+  dl(stamp()+"_tie-sheet.csv",L.join("\n"),"text/csv");
+};
+document.getElementById("exCross").onclick=()=>{
+  const L=["between_row,and_row,y_mm,x_mm,strand_moving_right,cables,strand_moving_left,cables"];
+  for(const c of D.crossings) L.push([c.r-1,c.r,Math.round(c.y*1000),Math.round(c.x*1000),c.a,c.na,c.b,c.nb].join(","));
+  dl(stamp()+"_crossings.csv",L.join("\n"),"text/csv");
+};
+function chartText(){
+  const cols=D.layout.cols, covered=new Uint8Array(cols);
+  for(const b of D.layout.seq) if(!b.isGround) for(let c=0;c<b.cols;c++) covered[b.c0+c]=1;
+  const lines=[`# al sadu loom chart — ${cols} pattern pairs × ${D.R+1} picks. '#' = pairs picked to the front (strands gather), '.' = pattern ground, ' ' = plain ground warp between bands`,
+               `# bands: `+D.layout.seq.map(b=>`${b.isCentre?"centre":b.name}${b.mirror?"'":""}@${b.c0}+${b.cols}`).join("  ")];
+  for(let r=0;r<=D.R;r++){ let s=""; for(let c=0;c<cols;c++) s+= !covered[c]?" " : (D.raster[r*cols+c]?"#":"."); lines.push(s); }
+  return lines.join("\n");
+}
+document.getElementById("exChart").onclick=()=>dl(stamp()+"_loom-chart.txt",chartText(),"text/plain");
+document.getElementById("exWeft").onclick=()=>{
+  const L=["row,y_mm,from_strand,to_strand,from_x_mm,to_x_mm,cables,strands_floated_over,float_len_mm"];
+  for(const h of D.hops) L.push([h.r,Math.round(h.y*1000),h.a,h.b,Math.round(h.xa*1000),Math.round(h.xb*1000),h.n,h.over,Math.round(Math.abs(h.xb-h.xa)*1000)].join(","));
+  dl(stamp()+"_weft.csv",L.join("\n"),"text/csv");
+};
+document.getElementById("exJson").onclick=()=>{
+  dl(stamp()+"_design.json",JSON.stringify({params:D.P, summary:summaryOf(D)},null,2),"application/json");
+};
+document.getElementById("exSvg").onclick=()=>{
+  const W=D.W*1000,H=D.H*1000;
+  const parts=[`<svg xmlns="http://www.w3.org/2000/svg" width="${W}mm" height="${H}mm" viewBox="0 0 ${W} ${H}">`,
+    `<rect width="${W}" height="${H}" fill="#ffffff"/>`,
+    `<g stroke="#000000" stroke-width="${D.P.dia}" fill="none" stroke-linejoin="round" stroke-linecap="round">`];
+  for(const c of D.cab){
+    let d=""; for(let i=0;i<c.pts.length;i+=2) d+=(i?"L":"M")+Math.round(c.pts[i]*1000)+" "+Math.round(c.pts[i+1]*1000)+" ";
+    parts.push(`<path d="${d}"/>`);
+  }
+  parts.push("</g>",`<g fill="#d8a24a">`);
+  for(const b of D.bulbs) parts.push(`<circle cx="${Math.round(b[0]*1000)}" cy="${Math.round(b[1]*1000)}" r="22"/>`);
+  parts.push("</g></svg>");
+  dl(stamp()+"_elevation.svg",parts.join("\n"),"image/svg+xml");
+};
+document.getElementById("exDxf").onclick=()=>{
+  const o=[];
+  const p=(c,v)=>{o.push(c);o.push(v);};
+  const X1=(D.W*1000).toFixed(2), Y1=(D.H*1000).toFixed(2);
+  p(0,"SECTION");p(2,"HEADER");
+  p(9,"$ACADVER");p(1,"AC1009");
+  p(9,"$INSBASE");p(10,0);p(20,0);p(30,0);
+  p(9,"$EXTMIN");p(10,0);p(20,"-"+Y1);p(30,0);
+  p(9,"$EXTMAX");p(10,X1);p(20,0);p(30,0);
+  p(0,"ENDSEC");
+  p(0,"SECTION");p(2,"TABLES");
+  p(0,"TABLE");p(2,"LAYER");p(70,5);
+  for(const [nm,col] of [["CABLES",7],["BULBS",2],["TIE_ROWS",8],["CROSSINGS",3],["WEFT",4]]){
+    p(0,"LAYER");p(2,nm);p(70,0);p(62,col);p(6,"CONTINUOUS");
+  }
+  p(0,"ENDTAB");p(0,"ENDSEC");
+  p(0,"SECTION");p(2,"ENTITIES");
+  for(const c of D.cab){
+    p(0,"POLYLINE");p(8,"CABLES");p(66,1);p(70,0);p(10,0);p(20,0);p(30,0);
+    for(let i=0;i<c.pts.length;i+=2){
+      p(0,"VERTEX");p(8,"CABLES");
+      p(10,(c.pts[i]*1000).toFixed(2));p(20,(-c.pts[i+1]*1000).toFixed(2));p(30,0);
+    }
+    p(0,"SEQEND");p(8,"CABLES");
+  }
+  for(const b of D.bulbs){
+    p(0,"CIRCLE");p(8,"BULBS");
+    p(10,(b[0]*1000).toFixed(2));p(20,(-b[1]*1000).toFixed(2));p(30,0);p(40,25);
+  }
+  for(const c of D.crossings){
+    p(0,"POINT");p(8,"CROSSINGS");
+    p(10,(c.x*1000).toFixed(2));p(20,(-c.y*1000).toFixed(2));p(30,0);
+  }
+  for(const h of D.hops){
+    p(0,"LINE");p(8,"WEFT");
+    p(10,(h.xa*1000).toFixed(2));p(20,(-h.y*1000).toFixed(2));p(30,0);
+    p(11,(h.xb*1000).toFixed(2));p(21,(-h.y*1000).toFixed(2));p(31,0);
+  }
+  for(let r=0;r<=D.R;r++){
+    p(0,"LINE");p(8,"TIE_ROWS");
+    p(10,0);p(20,(-r*D.dy*1000).toFixed(2));p(30,0);
+    p(11,(D.W*1000).toFixed(2));p(21,(-r*D.dy*1000).toFixed(2));p(31,0);
+  }
+  p(0,"ENDSEC");p(0,"EOF");
+  let s=""; for(let i=0;i<o.length;i+=2) s+=String(o[i]).padStart(3," ")+"\n"+o[i+1]+"\n";
+  dl(stamp()+"_elevation.dxf",s,"application/dxf");
+};
+document.getElementById("exPng").onclick=()=>{
+  cv.toBlob(b=>{const u=URL.createObjectURL(b),a=document.createElement("a");
+    a.href=u;a.download=stamp()+"_"+view+".png";a.click();
+    setTimeout(()=>URL.revokeObjectURL(u),400);});
+};
+
+/* ═══════════════════════ BOOT ═══════════════════════ */
+syncInputs(); buildBorders(); regen(true); renderFavs();
+setTimeout(()=>{draw();drawCharts();},60);
+</script>
+</body>
+</html>
