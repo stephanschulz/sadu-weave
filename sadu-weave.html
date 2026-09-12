@@ -165,6 +165,8 @@
     <label class="row"><span>grid pitch</span><input type="range" id="gridPitch" min="0.05" max="0.3" step="0.005"><b class="val"></b></label>
     <label class="row"><span>max run per row</span><input type="range" id="maxStep" min="1" max="6" step="1"><b class="val"></b></label>
     <label class="row"><span>lane offset</span><input type="range" id="laneOff" min="0" max="0.05" step="0.0025"><b class="val"></b></label>
+    <p class="note">lane offset lifts rightward runs above and leftward runs below the row line so they don't draw on top
+      of each other; 0 keeps every horizontal exactly on the grid line.</p>
     <label class="row"><span>edge rails (ribs tied to the wall)</span><input type="checkbox" id="edgeRails" style="flex:0 0 auto"></label>
     <label class="row"><span>rib pretension</span><input type="range" id="ribTension" min="20" max="600" step="10"><b class="val"></b></label>
     <label class="row"><span>allowed rib sag</span><input type="range" id="maxSag" min="5" max="150" step="5"><b class="val"></b></label>
@@ -269,6 +271,7 @@
         <button data-v="tech">Technical</button>
       </div>
       <button id="btnPolarity">◐ polarity</button>
+      <label class="row" style="margin:0"><input type="checkbox" id="showGrid" style="flex:0 0 auto"> <span style="color:var(--dim)">grid</span></label>
       <label class="row" style="margin:0"><span style="color:var(--dim)">view dist</span>
         <input type="range" id="blur" min="0" max="30" step="0.5" style="flex:0 0 90px"><b class="val" style="flex:0 0 44px"></b></label>
       <label class="row" style="margin:0"><span style="color:var(--dim)">line gain</span>
@@ -447,68 +450,68 @@ const GLYPH_KEYS=Object.keys(GLYPHS);
 /* ───────── presets ───────── */
 const bd=(motif,dup,gap,phase)=>({motif,dup:dup||1,gap:gap==null?1:gap,phase:phase|0});
 const PRESETS = {
-  "Eye lattice":     { layout:"tile", tile:{motif:"ein",     dup:1, gap:1, stagger:3}, grid:true, gridPitch:0.10, maxStep:2, laneOff:0.02, margin:0, rowScale:1, twine:1, twinePer:4, mirror:true, maxAng:45,
+  "Eye lattice":     { layout:"tile", tile:{motif:"ein",     dup:1, gap:1, stagger:3}, grid:true, gridPitch:0.10, maxStep:2, laneOff:0, margin:0, rowScale:1, twine:1, twinePer:4, mirror:true, maxAng:45,
     weftEvery:1, weftPhase:0, weftFloat:6, weftStep:3, weftJitter:0, weftHops:1, weftSag:0, weftSpan:"wall", weftMax:4, edgeRails:true, ribTension:250, maxSag:40,
     borders:[], centre:{glyphs:["bigDiamond"],gap:2,dup:1,rowScale:1,fit:true}},
-  "Diamond net":     { layout:"tile", tile:{motif:"zigzag",  dup:1, gap:1, stagger:4}, grid:true, gridPitch:0.10, maxStep:2, laneOff:0.02, margin:0, rowScale:1, twine:1, twinePer:4, mirror:true, maxAng:45,
+  "Diamond net":     { layout:"tile", tile:{motif:"zigzag",  dup:1, gap:1, stagger:4}, grid:true, gridPitch:0.10, maxStep:2, laneOff:0, margin:0, rowScale:1, twine:1, twinePer:4, mirror:true, maxAng:45,
     weftEvery:1, weftPhase:0, weftFloat:6, weftStep:3, weftJitter:0, weftHops:1, weftSag:0, weftSpan:"wall", weftMax:4, edgeRails:true, ribTension:250, maxSag:40,
     borders:[], centre:{glyphs:["bigDiamond"],gap:2,dup:1,rowScale:1,fit:true}},
-  "Pebble field":    { layout:"tile", tile:{motif:"uwairjan",dup:1, gap:1, stagger:2}, grid:true, gridPitch:0.10, maxStep:1, laneOff:0.02, margin:0, rowScale:2, twine:1, twinePer:4, mirror:true, maxAng:45,
+  "Pebble field":    { layout:"tile", tile:{motif:"uwairjan",dup:1, gap:1, stagger:2}, grid:true, gridPitch:0.10, maxStep:1, laneOff:0, margin:0, rowScale:2, twine:1, twinePer:4, mirror:true, maxAng:45,
     weftEvery:1, weftPhase:0, weftFloat:6, weftStep:3, weftJitter:0, weftHops:1, weftSag:0, weftSpan:"wall", weftMax:4, edgeRails:true, ribTension:250, maxSag:40,
     borders:[], centre:{glyphs:["bigDiamond"],gap:2,dup:1,rowScale:1,fit:true}},
-  "Cross net":       { layout:"tile", tile:{motif:"cross",   dup:1, gap:1, stagger:2}, grid:true, gridPitch:0.10, maxStep:2, laneOff:0.02, margin:0, rowScale:1, twine:1, twinePer:4, mirror:true, maxAng:45,
+  "Cross net":       { layout:"tile", tile:{motif:"cross",   dup:1, gap:1, stagger:2}, grid:true, gridPitch:0.10, maxStep:2, laneOff:0, margin:0, rowScale:1, twine:1, twinePer:4, mirror:true, maxAng:45,
     weftEvery:1, weftPhase:0, weftFloat:6, weftStep:3, weftJitter:0, weftHops:1, weftSag:0, weftSpan:"wall", weftMax:4, edgeRails:true, ribTension:250, maxSag:40,
     borders:[], centre:{glyphs:["bigDiamond"],gap:2,dup:1,rowScale:1,fit:true}},
-  "Fir forest":      { layout:"tile", tile:{motif:"shajar",  dup:1, gap:1, stagger:2}, grid:true, gridPitch:0.10, maxStep:2, laneOff:0.02, margin:0, rowScale:2, twine:1, twinePer:4, mirror:true, maxAng:45,
+  "Fir forest":      { layout:"tile", tile:{motif:"shajar",  dup:1, gap:1, stagger:2}, grid:true, gridPitch:0.10, maxStep:2, laneOff:0, margin:0, rowScale:2, twine:1, twinePer:4, mirror:true, maxAng:45,
     weftEvery:1, weftPhase:0, weftFloat:6, weftStep:3, weftJitter:0, weftHops:1, weftSag:0, weftSpan:"wall", weftMax:4, edgeRails:true, ribTension:250, maxSag:40,
     borders:[], centre:{glyphs:["bigDiamond"],gap:2,dup:1,rowScale:1,fit:true}},
   "Sadu strip (default)":{
     layout:"sadu", edgeRails:true, ribTension:250, maxSag:40,
     rows:32, rowScale:1, twine:0.6, twinePer:4, mirror:true, maxAng:45,
-    grid:true, gridPitch:0.10, maxStep:2, laneOff:0.02, edgeRails:true, ribTension:250, maxSag:40,
-    grid:true, gridPitch:0.10, maxStep:2, laneOff:0.02, margin:0,
+    grid:true, gridPitch:0.10, maxStep:2, laneOff:0, edgeRails:true, ribTension:250, maxSag:40,
+    grid:true, gridPitch:0.10, maxStep:2, laneOff:0, margin:0,
     weftEvery:1, weftPhase:0, weftFloat:6, weftStep:3, weftJitter:0, weftHops:1, weftSag:0, weftSpan:"wall",
     borders:[bd("stripe",2,1),bd("zigzag",1,1),bd("ein",1,1),bd("dhurs",1,1),bd("uwairjan",1,2)],
     centre:{glyphs:["bigDiamond","tree","nested"],gap:3,dup:2,rowScale:2,fit:true}},
   "Columns of eyes":{
     layout:"sadu", edgeRails:true, ribTension:250, maxSag:40,
     rows:36, rowScale:1, twine:0.6, twinePer:4, mirror:true, maxAng:45,
-    grid:true, gridPitch:0.10, maxStep:2, laneOff:0.02, margin:0,
+    grid:true, gridPitch:0.10, maxStep:2, laneOff:0, margin:0,
     weftEvery:1, weftPhase:0, weftFloat:6, weftStep:3, weftJitter:0, weftHops:1, weftSag:0.02, weftSpan:"wall",
     borders:[bd("zigzag",1,1),bd("ein",1,1),bd("zigzag",1,1),bd("diamond",1,1),bd("ein",1,1)],
     centre:{glyphs:["solid","solid","solid"],gap:2,dup:1,rowScale:2,fit:true}},
   "Big shajarah":{
     layout:"sadu", edgeRails:true, ribTension:250, maxSag:40,
     rows:34, rowScale:1, twine:0.55, twinePer:4, mirror:true, maxAng:45,
-    grid:true, gridPitch:0.12, maxStep:3, laneOff:0.02, margin:0,
+    grid:true, gridPitch:0.12, maxStep:3, laneOff:0, margin:0,
     weftEvery:1, weftPhase:0, weftFloat:8, weftStep:4, weftJitter:0, weftHops:1, weftSag:0.04, weftSpan:"wall",
     borders:[bd("dhurs",1,1),bd("ein",1,1),bd("hubub",1,2)],
     centre:{glyphs:["nested","solid"],gap:2,dup:3,rowScale:3,fit:true}},
   "Ribs and seeds":{
     layout:"sadu", edgeRails:true, ribTension:250, maxSag:40,
     rows:40, rowScale:1, twine:0.7, twinePer:3, mirror:true, maxAng:45,
-    grid:true, gridPitch:0.10, maxStep:1, laneOff:0.02, margin:0,
+    grid:true, gridPitch:0.10, maxStep:1, laneOff:0, margin:0,
     weftEvery:1, weftPhase:0, weftFloat:6, weftStep:3, weftJitter:0, weftHops:1, weftSag:0.02, weftSpan:"wall",
     borders:[bd("hubub",1,1),bd("dealla",1,1),bd("hubub",1,1),bd("ladder",1,1),bd("dealla",1,2)],
     centre:{glyphs:["comb","bars","comb","bars"],gap:3,dup:2,rowScale:1,fit:true}},
   "Teeth border":{
     layout:"sadu", edgeRails:true, ribTension:250, maxSag:40,
     rows:32, rowScale:1, twine:0.6, twinePer:5, mirror:true, maxAng:45,
-    grid:true, gridPitch:0.10, maxStep:2, laneOff:0.02, margin:0,
+    grid:true, gridPitch:0.10, maxStep:2, laneOff:0, margin:0,
     weftEvery:1, weftPhase:0, weftFloat:5, weftStep:2, weftJitter:0.3, weftHops:1, weftSag:0.03, weftSpan:"wall",
     borders:[bd("stripe",3,1),bd("dhurs",1,0),bd("teethIn",1,1),bd("vees",1,2)],
     centre:{glyphs:["steps","hourglass","steps"],gap:3,dup:2,rowScale:1,fit:true}},
   "Sparse stripes":{
     layout:"sadu", edgeRails:true, ribTension:250, maxSag:40,
     rows:28, rowScale:2, twine:0.5, twinePer:4, mirror:true, maxAng:40,
-    grid:true, gridPitch:0.125, maxStep:2, laneOff:0.025, margin:0,
+    grid:true, gridPitch:0.125, maxStep:2, laneOff:0, margin:0,
     weftEvery:1, weftPhase:0, weftFloat:10, weftStep:5, weftJitter:0, weftHops:1, weftSag:0.05, weftSpan:"wall",
     borders:[bd("stripe",2,3),bd("cross",1,3),bd("stripe",2,3)],
     centre:{glyphs:["bigDiamond"],gap:6,dup:2,rowScale:3,fit:true}},
   "Asymmetric strip":{
     layout:"sadu", edgeRails:true, ribTension:250, maxSag:40,
     rows:34, rowScale:1, twine:0.6, twinePer:4, mirror:false, maxAng:45,
-    grid:true, gridPitch:0.10, maxStep:2, laneOff:0.02, margin:0,
+    grid:true, gridPitch:0.10, maxStep:2, laneOff:0, margin:0,
     weftEvery:1, weftPhase:0, weftFloat:6, weftStep:2, weftJitter:0.3, weftHops:1, weftSag:0.03, weftSpan:"wall",
     borders:[bd("zigzag",1,1),bd("ein",1,1),bd("dhurs",1,1),bd("shajar",2,1),bd("uwairjan",2,0),bd("dhurs",1,1),bd("ein",1,1),bd("zigzag",1,0)],
     centre:{glyphs:["tree","arrow"],gap:3,dup:2,rowScale:1,fit:true}},
@@ -518,7 +521,7 @@ const PRESETS = {
 const P = {
   seed:12345, width:7, height:7, count:1000, dia:5.5, gpm:40, bulbMass:120,
   rows:32, maxDepth:6.9, margin:0, maxAng:45, snap:0, pack:1,
-  grid:true, gridPitch:0.10, maxStep:2, laneOff:0.02, edgeRails:true, ribTension:250, maxSag:40,
+  grid:true, gridPitch:0.10, maxStep:2, laneOff:0, edgeRails:true, ribTension:250, maxSag:40,
   layout:"tile", tile:{motif:"ein", dup:1, gap:1, stagger:3},
   rowScale:1, twine:1.0, twinePer:4, mirror:true,
   weftEvery:1, weftPhase:0, weftFloat:6, weftStep:3, weftJitter:0, weftHops:1, weftSag:0.0, weftSpan:"wall", weftMax:4,
@@ -526,7 +529,7 @@ const P = {
   borders: PRESETS["Sadu strip (default)"].borders.map(b=>({...b})),
   centre: {...PRESETS["Sadu strip (default)"].centre, glyphs:[...PRESETS["Sadu strip (default)"].centre.glyphs], fit:true},
 };
-let view="weave", polarity=1, blurPx=4, gain=1.2;
+let view="weave", polarity=1, blurPx=4, gain=1.2, showGrid=false;
 let D = null;
 
 /* ═══════════════════════ COMPOSITION ═══════════════════════ */
@@ -740,6 +743,7 @@ function generate(P){
       if(toRight) B.cables.unshift(id); else B.cables.push(id);
       const c=cab[id]; c.node=B.id;
       const wB=bw(B.cables.length), offB = toRight ? -wB/2 : wB/2;
+      c.off = offB;                                                              // its slot in the new bundle, for life
       const lane = gridOn ? (toRight? -P.laneOff : P.laneOff) : 0;
       c.pts.push(xb+offB, r*dy + lane + P.weftSag*(0.5+0.5*k/Math.max(1,count)));   // stacked wefts sit a little apart
       moved++;
@@ -870,7 +874,7 @@ function generate(P){
     const groups=new Map();
     for(const nd of allNodes){ const key = gridOn ? nd.tcol : (nd.band.id+":"+nd.cell); if(!groups.has(key)) groups.set(key,[]); groups.get(key).push(nd); }
     for(const [key,list] of groups){
-      const m=list.length, sp = m>1 ? Math.min(colPitch*0.6/(m-1), colPitch*0.3) : 0;
+      const m=list.length, sp = (!gridOn && m>1) ? Math.min(colPitch*0.6/(m-1), colPitch*0.3) : 0;
       list.forEach((nd,i)=>{
         const b=nd.band;
         let x = gridOn ? mg + (nd.tcol+0.5)*colPitch + (i-(m-1)/2)*sp
@@ -881,10 +885,11 @@ function generate(P){
           x = clamp(x, mg+w/2, W-mg-w/2);
           nd.path.push(x); nd.count.push(nc);
           const moved = nd.pcol!==undefined && nd.tcol!==nd.pcol;
+          const slot=(k)=>{ const c=cab[nd.cables[k]]; if(c.off===undefined) c.off = nc>1?((k/(nc-1))-0.5)*w:0; return c.off; };
           if(moved){ const lane = x>prev ? -P.laneOff : P.laneOff; runCells+=Math.abs(nd.tcol-nd.pcol); runs++; runLen+=Math.abs(x-prev);
-            for(let k=0;k<nc;k++){ const off = nc>1?((k/(nc-1))-0.5)*w:0;
+            for(let k=0;k<nc;k++){ const off=slot(k);
               cab[nd.cables[k]].pts.push(prev+off, y+lane, x+off, y+lane); cab[nd.cables[k]].node=nd.id; } }
-          else for(let k=0;k<nc;k++){ const off = nc>1?((k/(nc-1))-0.5)*w:0; cab[nd.cables[k]].pts.push(x+off, y); cab[nd.cables[k]].node=nd.id; }
+          else for(let k=0;k<nc;k++){ const off=slot(k); cab[nd.cables[k]].pts.push(x+off, y); cab[nd.cables[k]].node=nd.id; }
           nd.pcol = nd.tcol;
         } else {
           if(!b.isGround) x += twA*tri(r/Math.max(1,P.twinePer) + (nd.c%2)*0.5);   // twining
@@ -941,7 +946,8 @@ function generate(P){
         while(lo<hi){const m=(lo+hi)>>1; if(cw[m]<=v)lo=m+1;else hi=m;}
         const nd=pool[lo], n=nd.cables.length;
         const side = rng()<0.5 ? 0 : n-1;
-        const w=bw(n), off = n>1?((side/(n-1))-0.5)*w:0;
+        const w=bw(n), cs=cab[nd.cables[side]];
+        const off = gridOn && cs.off!==undefined ? cs.off : (n>1?((side/(n-1))-0.5)*w:0);
         const x = nd.path[nd.path.length-1]+off;
         const y = clamp(r*dy + tLo[r] + rng()*(tHi[r]-tLo[r]), 0, H);
         const d = minDist(x,y);
@@ -1106,11 +1112,29 @@ function draw(){
   const fg = polarity? "#0d0b09" : "#efe9de";
   ctx.setTransform(1,0,0,1,0,0);
   ctx.fillStyle=bg; ctx.fillRect(0,0,cv.width,cv.height);
+  if(showGrid && D.gridOn && view!=="density") drawBaseGrid();
   const lw = Math.max(0.35, D.dia*scale)*gain;
   if(view==="density"){ drawDensity(bg,fg,lw); }
   else if(view==="bulbs"){ drawBulbs(bg,fg); }
   else if(view==="tech"){ drawTech(bg,fg,lw); }
   else { drawWeave(fg,lw,true); }
+}
+/* the lines the cables actually follow: column centres and row lines of the grid */
+function drawBaseGrid(){
+  const cols=D.layout.cols, mg=D.P.margin;
+  ctx.save(); ctx.lineWidth=1;
+  ctx.strokeStyle = polarity ? "rgba(120,100,70,.22)" : "rgba(216,162,74,.20)";
+  ctx.beginPath();
+  for(let c=0;c<cols;c++){ const X=(mg+(c+0.5)*D.colPitch)*scale; ctx.moveTo(X,0); ctx.lineTo(X,D.H*scale); }
+  for(let r=0;r<=D.R;r++){ const Y=r*D.dy*scale; ctx.moveTo(0,Y); ctx.lineTo(D.W*scale,Y); }
+  ctx.stroke();
+  ctx.strokeStyle = polarity ? "rgba(120,100,70,.35)" : "rgba(216,162,74,.32)"; ctx.beginPath();
+  for(let c=0;c<cols;c+=10){ const X=(mg+(c+0.5)*D.colPitch)*scale; ctx.moveTo(X,0); ctx.lineTo(X,D.H*scale); }
+  for(let r=0;r<=D.R;r+=10){ const Y=r*D.dy*scale; ctx.moveTo(0,Y); ctx.lineTo(D.W*scale,Y); }
+  ctx.stroke();
+  ctx.fillStyle = polarity ? "rgba(120,100,70,.7)" : "rgba(216,162,74,.7)"; ctx.font=`${Math.max(9,10*scale/200)}px ui-monospace,monospace`;
+  for(let m=1;m<D.W;m++) ctx.fillText(m+" m", m*scale+3, 12*Math.max(1,scale/200));
+  ctx.restore();
 }
 function strokeCables(colour,lw,alpha){
   ctx.lineWidth=lw; ctx.strokeStyle=colour; ctx.globalAlpha=alpha;
@@ -1561,7 +1585,7 @@ function randomiseWithin(pr){
   applyParams(pr);
   P.seed=(R()*1e9)|0;
   P.gridPitch=+(Math.round(pr.gridPitch*rf(0.9,1.15)/0.005)*0.005).toFixed(3);
-  P.maxStep=clamp((pr.maxStep|0)+ri(-1,1),1,4); P.laneOff=+rf(0.01,0.03).toFixed(4);
+  P.maxStep=clamp((pr.maxStep|0)+ri(-1,1),1,4); P.laneOff=0;
   P.rowScale=clamp((pr.rowScale|0)+(R()<0.3?ri(-1,1):0),1,3);
   P.twine=R()<0.15?0:+rf(0.6,1.2).toFixed(2); P.twinePer=clamp((pr.twinePer|0)+ri(-2,2),1,8);
   P.shedGamma=+rf(0.6,1.1).toFixed(2); P.tailFactor=+rf(0.5,2.5).toFixed(1); P.topClear=+pick([0.2,0.4,0.4,0.6]).toFixed(2); P.minGap=ri(30,100);
@@ -1633,6 +1657,7 @@ document.querySelectorAll("#viewSeg button").forEach(b=>b.onclick=()=>{
   b.classList.add("on"); view=b.dataset.v; draw();
 });
 document.getElementById("btnPolarity").onclick=()=>{polarity=polarity?0:1;draw();};
+document.getElementById("showGrid").addEventListener("change",e=>{ showGrid=e.target.checked; draw(); });
 document.getElementById("blur").addEventListener("input",e=>{
   blurPx=parseFloat(e.target.value);
   e.target.parentElement.querySelector(".val").textContent=fmt(blurPx,1);
@@ -1657,6 +1682,7 @@ window.addEventListener("keydown",e=>{
   if(e.target.tagName==="INPUT"||e.target.tagName==="SELECT")return;
   if(e.key==="r"){document.getElementById("btnRand").click();}
   if(e.key==="p"){polarity=polarity?0:1;draw();}
+  if(e.key==="g"){ showGrid=!showGrid; document.getElementById("showGrid").checked=showGrid; draw(); }
   if(e.key>="1"&&e.key<="4"){document.querySelectorAll("#viewSeg button")[+e.key-1].click();}
 });
 

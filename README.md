@@ -76,6 +76,14 @@ ribs leave half the motif frozen near the beam; **one plain anchor strand betwee
 tiles** at 250 N frees it almost completely (84 of ~2,300 moves shortened). The
 anchor column is the structure; the rib tension is secondary.
 
+**Everything on the grid.** In grid mode every segment is exactly vertical or
+exactly horizontal: strands sharing a cell sit on the column line, each cable
+keeps a fixed slot inside its bundle for life (so it never drifts sideways as
+neighbours shed or hop), and horizontals lie on the row line (`lane offset` 0;
+raise it only if you want rightward and leftward runs drawn apart). The **grid**
+toggle in the top bar (or `g`) draws the lines the cables follow — column centres
+and row lines, every tenth stronger, with a metre scale.
+
 ## Layout — tile or strip
 
 *composition* = **tile one motif across the wall** repeats a single lexicon motif
@@ -216,4 +224,4 @@ part.
 | `elevation.svg` / `.dxf` | 1:1 in millimetres |
 | `design.json` | parameters + summary — reproduce exactly |
 
-Keyboard: `r` new seed · `s` save favourite · `p` polarity · `1`–`4` views.
+Keyboard: `r` new seed · `s` save favourite · `p` polarity · `g` grid · `1`–`4` views.
