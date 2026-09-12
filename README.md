@@ -1,6 +1,6 @@
 # Al Sadu Cable Weave — loom model
 
-Live: **https://stephanschulz.github.io/sadu-weave/**
+Live: **https://stephanschulz.ca/sadu-weave/**
 
 Or open **`sadu-weave.html`** in a browser (double-click it). No server, no build, no
 dependencies. Use `file://` — the exports are real file downloads.
