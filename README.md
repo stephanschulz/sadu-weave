@@ -71,6 +71,17 @@ enforces a **support rule** on the grid, with real physics behind it:
   drawn as red ✕ in the Technical view. Expect a few dozen, all in the lowest
   rows where the ribs have run out of cables.
 
+- **Structural columns run to the bottom.** The plain ground strands between
+  tiles (or bands) keep `structural column reserve` cables (default 3) all the
+  way to the last row — never given to a rib, never dropped to a bulb early — so
+  there is always a live vertical to tie to, even in the lowest metre where the
+  pattern strands have emptied. A run may only land on a column that provably
+  continues below (a structural column, or a strand with ≥ 2 cables), and a
+  strand that just received a run is never emptied in that same row. The panel
+  reports *structural columns to the bottom* and *runs landing on a column that
+  ends there* (must be 0); the Technical view draws structural columns as
+  full-height orange rails.
+
 What this taught us, measured: with no fixed column between tiles even 600 N
 ribs leave half the motif frozen near the beam; **one plain anchor strand between
 tiles** at 250 N frees it almost completely (84 of ~2,300 moves shortened). The
