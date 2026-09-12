@@ -1,0 +1,316 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Lattice editor — Pulse Qatar</title>
+<style>
+  :root{ --bg:#f2ede4; --ink:#0d0b09; --panel:#1b1916; --panel-ink:#e9e2d6; --dim:#9a9186; --mono:ui-monospace,Menlo,monospace; }
+  html,body{ margin:0; height:100%; background:#2a2723; color:var(--panel-ink); font:13px/1.35 -apple-system,BlinkMacSystemFont,"Helvetica Neue",Arial,sans-serif; }
+  body{ display:grid; grid-template-columns:300px 1fr; height:100vh; }
+  aside{ background:var(--panel); padding:12px 14px; overflow:auto; border-right:1px solid #000; }
+  h1{ font-size:14px; margin:0 0 8px; letter-spacing:.02em; }
+  h2{ font-size:11px; text-transform:uppercase; letter-spacing:.08em; color:var(--dim); margin:14px 0 6px; }
+  label{ display:flex; align-items:center; justify-content:space-between; gap:8px; margin:4px 0; font-size:12px; }
+  label input[type=number], label select{ width:110px; background:#0f0e0c; color:var(--panel-ink); border:1px solid #3a352f; border-radius:4px; padding:3px 5px; font:12px var(--mono); }
+  .btnrow{ display:flex; flex-wrap:wrap; gap:6px; margin:6px 0; }
+  button{ background:#2d2925; color:var(--panel-ink); border:1px solid #4a443c; border-radius:5px; padding:5px 9px; font-size:12px; cursor:pointer; }
+  button:hover{ background:#3a352f; }
+  button.primary{ background:#7fb3a3; color:#0d0b09; border-color:#7fb3a3; font-weight:600; }
+  .swatches{ display:flex; flex-wrap:wrap; gap:6px; margin:6px 0; }
+  .sw{ width:34px; height:26px; border-radius:5px; border:2px solid transparent; cursor:pointer; box-shadow:inset 0 0 0 1px #000; }
+  .sw.on{ border-color:#fff; }
+  .sw.erase{ background:repeating-linear-gradient(45deg,#f2ede4 0 4px,#cfc8bd 4px 8px); }
+  .note{ font-size:11px; color:var(--dim); margin:4px 0 0; }
+  .readout{ font:11px var(--mono); color:var(--dim); margin-top:4px; white-space:pre-line; }
+  main{ position:relative; overflow:auto; background:#2a2723; }
+  #stage{ position:absolute; inset:0; display:flex; align-items:center; justify-content:center; }
+  svg{ background:var(--bg); box-shadow:0 0 0 1px #000, 0 8px 40px rgba(0,0,0,.5); touch-action:none; }
+  .hit{ stroke:transparent; stroke-width:6; cursor:crosshair; }
+  .hit:hover{ stroke:rgba(127,179,163,.35); }
+  .carrier{ stroke:#0d0b09; stroke-width:0.25; fill:none; pointer-events:none; }
+  .paint{ fill:none; stroke-linecap:round; pointer-events:none; }
+  .anchor{ fill:#0d0b09; pointer-events:none; }
+  .anchorHit{ fill:transparent; cursor:pointer; }
+  .anchorHit:hover{ fill:rgba(127,179,163,.45); }
+  .freeHit{ stroke:transparent; stroke-width:7; cursor:pointer; fill:none; }
+  .freeHit:hover{ stroke:rgba(127,179,163,.35); }
+  .rubber{ stroke-dasharray:3 2; pointer-events:none; fill:none; }
+  #hud{ position:absolute; left:10px; bottom:8px; font:11px var(--mono); color:#cfc8bd; background:rgba(0,0,0,.45); padding:4px 7px; border-radius:4px; pointer-events:none; }
+  kbd{ font:11px var(--mono); background:#0f0e0c; border:1px solid #3a352f; border-radius:3px; padding:0 4px; }
+</style>
+</head>
+<body>
+<aside>
+  <h1>Lattice editor</h1>
+  <p class="note">Start from the carrier lattice, click segments to colour them, save the design as SVG (and JSON to reload or to feed the weave app).</p>
+
+  <h2>Lattice</h2>
+  <label>carrier <select id="kind">
+    <option value="xx">two diagonal families ±θ (reflect at rails)</option>
+    <option value="vd">verticals + one diagonal (down-right)</option>
+    <option value="vxd">verticals + both diagonals</option>
+  </select></label>
+  <label>angle from vertical ° <input type="number" id="angle" value="45" min="10" max="80" step="1"></label>
+  <label>start pitch cm <input type="number" id="pitch" value="20" min="5" max="100" step="5"></label>
+  <label>wall width m <input type="number" id="wallW" value="7" min="1" max="30" step="0.5"></label>
+  <label>wall height m <input type="number" id="wallH" value="7" min="1" max="30" step="0.5"></label>
+  <label><span>close the diamonds on the floor</span><input type="checkbox" id="snap" checked></label>
+  <label>anchors per vertical cell <input type="number" id="subV" value="1" min="1" max="6" step="1"></label>
+  <label>anchors per diagonal cell <input type="number" id="subD" value="1" min="1" max="6" step="1"></label>
+  <label><span>show anchor dots</span><input type="checkbox" id="showAnchors" checked></label>
+  <p class="note">Extra tie points between two crossings: each vertical (or diagonal) segment is split into that many paintable pieces, and every tie point gets a dot. <b>Click a dot</b> to start a free line, move, and <b>click another dot</b> to place it — a straight cable between any two anchors. A second line between the same two anchors sits beside the first. Clicking a line with its own colour deletes it; another colour recolours it. <kbd>esc</kbd> cancels a line in progress.</p>
+  <div class="btnrow"><button id="rebuild" class="primary">rebuild lattice</button><label style="margin:0"><input type="checkbox" id="autoRebuild" checked> auto rebuild</label></div>
+  <div class="readout" id="latInfo"></div>
+  <p class="note">Rebuilding keeps colours where the segment ids still match (same kind, pitch and anchors).</p>
+
+  <h2>Paint</h2>
+  <div class="swatches" id="swatches"></div>
+  <label>design stroke cm <input type="number" id="pw" value="1.3" min="0.3" max="20" step="0.1"></label>
+  <label>side-by-side offset cm <input type="number" id="lineOff" value="2" min="0" max="20" step="0.5"></label>
+  <p class="note">Distance between colours on the same segment or between the same two anchors: the first sits on the line, the next ones this far to either side. 0 stacks them.</p>
+  <p class="note">Click a segment to paint it with the selected colour; another colour on the same segment sits beside it (see the offset below). Drag to paint many. <kbd>shift</kbd>-click paints the whole line. Clicking with a colour the segment already has takes that colour off; the eraser clears the segment. <kbd>z</kbd> undo, <kbd>1</kbd>–<kbd>6</kbd> colours, <kbd>0</kbd> eraser.</p>
+  <div class="btnrow"><button id="undo">undo</button><button id="clear">clear all</button></div>
+  <div class="readout" id="paintInfo"></div>
+
+  <h2>View</h2>
+  <label>zoom <input type="range" id="zoom" min="0.3" max="4" step="0.05" value="1" style="width:110px"></label>
+  <label><span>show carrier lattice</span><input type="checkbox" id="showCarrier" checked></label>
+
+  <h2>Save</h2>
+  <div class="btnrow"><button id="saveSvg" class="primary">save SVG</button><button id="saveJson">save JSON</button><button id="loadJson">load JSON</button></div>
+  <input type="file" id="file" accept="application/json" style="display:none">
+  <p class="note">SVG is in centimetres (1 unit = 1 cm), design strokes as drawn, carrier as thin lines, and the design data embedded in &lt;metadata&gt;. Open it from file:// to allow downloads. Work is autosaved in this browser.</p>
+</aside>
+<main>
+  <div id="stage"></div>
+  <div id="hud"></div>
+</main>
+<script>
+"use strict";
+/* ───────── geometry ─────────
+   A lattice is a set of LINES, each a polyline from the top (or a rail) down,
+   cut at every node row into SEGMENTS. Segment id = line id + row index, so a
+   design survives a rebuild when kind and pitch stay the same.                 */
+const PALETTE=[["#0d0b09","black"],["#1a5fd6","blue"],["#d8352a","red"],["#2f9e5f","green"],["#d8a24a","amber"],["#8a5cd6","violet"]];
+let L=null;                              // {kind,W,H,pitch,angle,rowPitch,lines:[{id,pts:[[x,y]...],kind}], segs:[{id,line,i,x1,y1,x2,y2}]}
+let paint=new Map();                     // seg id → [colour, colour, …] side by side, in the order they were added
+let free=[];                             // free lines between two anchors: {id, a, b, colour}  (a, b = anchor ids)
+let freeSeq=1, pending=null;             // pending = {a} while a free line is being drawn
+let undoStack=[];
+let colour=PALETTE[0][0];                // current colour; null = eraser
+const $=id=>document.getElementById(id);
+
+function buildLattice(o){
+  const W=o.W*100, H=o.H*100, p=o.pitch, kind=o.kind;
+  let ang=o.angle*Math.PI/180;
+  /* node rows: xx/vxd every (p/2)/tanθ, vd every p/tanθ — snap the angle so the floor is a node row */
+  const rowOf=(a)=> (kind==="vd" ? p : p/2)/Math.tan(a);
+  if(o.snap){ const n=Math.max(1,Math.round(H/rowOf(ang))); const rp=H/n; ang=Math.atan((kind==="vd"?p:p/2)/rp); }
+  const t=Math.tan(ang), rowPitch=rowOf(ang), nRows=Math.round(H/rowPitch);
+  const lines=[];
+  const starts=[]; for(let x=p/2; x<W; x+=p) starts.push(x);
+  const diag=(x0,y0,dir,id)=>{           // reflecting diagonal (xx / vxd)
+    const pts=[[x0,y0]]; let x=x0,y=y0,d=dir;
+    while(y<H-1e-6){ const xr = d>0 ? W : 0; const dyRail=(xr-x)/(d*t), dyBot=H-y;
+      if(dyRail<dyBot-1e-6){ x=xr; y+=dyRail; pts.push([x,y]); d=-d; } else { x+=d*t*dyBot; y=H; pts.push([x,y]); } }
+    return {id, kind:"d"+(dir>0?"r":"l"), pts};
+  };
+  const diagOneWay=(x0,y0,id)=>{         // down-right, ends at the right rail or the floor
+    const dyRail=(W-x0)/t, dyBot=H-y0; const dy=Math.min(dyRail,dyBot);
+    return {id, kind:"dr", pts:[[x0,y0],[x0+t*dy, y0+dy]]};
+  };
+  if(kind==="xx"||kind==="vxd"){ starts.forEach((x0,k)=>{ lines.push(diag(x0,0,1,`R${k}`)); lines.push(diag(x0,0,-1,`L${k}`)); }); }
+  if(kind==="vd"){ starts.forEach((x0,k)=> lines.push(diagOneWay(x0,0,`D${k}`)));
+    let k=0; for(let y0=rowPitch/2; y0<H; y0+=rowPitch, k++) lines.push(diagOneWay(0,y0,`E${k}`)); }   // enter from the left rail
+  if(kind==="vd"||kind==="vxd"){ starts.forEach((x0,k)=> lines.push({id:`V${k}`, kind:"v", pts:[[x0,0],[x0,H]]})); }
+  /* cut every line at the node rows */
+  const segs=[];
+  for(const ln of lines){
+    const ys=[]; const y0=ln.pts[0][1], y1=ln.pts[ln.pts.length-1][1];
+    const r0=Math.ceil(y0/rowPitch-1e-6), r1=Math.floor(y1/rowPitch+1e-6);
+    const cuts=[y0]; for(let r=r0;r<=r1;r++){ const y=r*rowPitch; if(y>y0+1e-6 && y<y1-1e-6) cuts.push(y); } cuts.push(y1);
+    const xAt=(y)=>{ for(let i=0;i+1<ln.pts.length;i++){ const [xa,ya]=ln.pts[i],[xb,yb]=ln.pts[i+1]; if(y>=ya-1e-6 && y<=yb+1e-6){ const f=(yb-ya)<1e-9?0:(y-ya)/(yb-ya); return xa+f*(xb-xa); } } return ln.pts[ln.pts.length-1][0]; };
+    const sub = Math.max(1, (ln.kind==="v" ? o.subV : o.subD)|0);
+    for(let i=0;i+1<cuts.length;i++){ const ya=cuts[i], yb=cuts[i+1]; if(yb-ya<1e-6) continue;
+      const ri=Math.floor(ya/rowPitch+1e-6);      // start row of the segment (a rail-born diagonal starts mid-row: floor keeps ids unique)
+      if(sub===1){ segs.push({id:`${ln.id}:${ri}`, line:ln.id, i, x1:xAt(ya), y1:ya, x2:xAt(yb), y2:yb}); continue; }
+      for(let k=0;k<sub;k++){ const y0=ya+(yb-ya)*k/sub, y1=ya+(yb-ya)*(k+1)/sub;
+        segs.push({id:`${ln.id}:${ri}.${k}`, line:ln.id, i, sub, x1:xAt(y0), y1:y0, x2:xAt(y1), y2:y1}); } }
+  }
+  /* anchors: every segment end (nodes, rail points and the extra tie points) */
+  const anchors=new Map(); const aid=(x,y)=>`${x.toFixed(1)},${y.toFixed(1)}`;
+  for(const sg of segs){ sg.aId=aid(sg.x1,sg.y1); sg.bId=aid(sg.x2,sg.y2); if(!anchors.has(sg.aId)) anchors.set(sg.aId,{id:sg.aId,x:sg.x1,y:sg.y1}); if(!anchors.has(sg.bId)) anchors.set(sg.bId,{id:sg.bId,x:sg.x2,y:sg.y2}); }
+  return {kind, W:o.W, H:o.H, pitch:p, angle:ang*180/Math.PI, rowPitch, nRows, lines, segs, anchors};
+}
+
+/* ───────── render ───────── */
+const NS="http://www.w3.org/2000/svg";
+let svg=null, gCarrier=null, gPaint=null, gHit=null, gAnchor=null, gFreeHit=null, rubber=null;
+function render(){
+  const W=L.W*100, H=L.H*100;
+  $("stage").innerHTML="";
+  svg=document.createElementNS(NS,"svg"); svg.setAttribute("viewBox",`0 0 ${W} ${H}`); svg.setAttribute("xmlns",NS);
+  gCarrier=document.createElementNS(NS,"g"); gCarrier.setAttribute("class","carrier");
+  gPaint=document.createElementNS(NS,"g"); gPaint.setAttribute("class","paint");
+  gHit=document.createElementNS(NS,"g");
+  for(const ln of L.lines){ const pl=document.createElementNS(NS,"polyline"); pl.setAttribute("points",ln.pts.map(q=>q[0].toFixed(2)+","+q[1].toFixed(2)).join(" ")); gCarrier.appendChild(pl); }
+  const border=document.createElementNS(NS,"rect"); border.setAttribute("x",0); border.setAttribute("y",0); border.setAttribute("width",W); border.setAttribute("height",H); border.setAttribute("fill","none"); border.setAttribute("stroke","#0d0b09"); border.setAttribute("stroke-width","0.4");
+  for(const sg of L.segs){
+    const h=document.createElementNS(NS,"line"); h.setAttribute("class","hit"); h.dataset.id=sg.id; h.dataset.line=sg.line;
+    h.setAttribute("x1",sg.x1.toFixed(2)); h.setAttribute("y1",sg.y1.toFixed(2)); h.setAttribute("x2",sg.x2.toFixed(2)); h.setAttribute("y2",sg.y2.toFixed(2));
+    gHit.appendChild(h);
+  }
+  gAnchor=document.createElementNS(NS,"g"); gFreeHit=document.createElementNS(NS,"g");
+  rubber=document.createElementNS(NS,"line"); rubber.setAttribute("class","rubber"); rubber.style.display="none";
+  for(const a of L.anchors.values()){ const h=document.createElementNS(NS,"circle"); h.setAttribute("class","anchorHit"); h.setAttribute("cx",a.x.toFixed(2)); h.setAttribute("cy",a.y.toFixed(2)); h.setAttribute("r","4.5"); h.dataset.aid=a.id; gAnchor.appendChild(h);
+    const d=document.createElementNS(NS,"circle"); d.setAttribute("class","anchor"); d.setAttribute("cx",a.x.toFixed(2)); d.setAttribute("cy",a.y.toFixed(2)); d.setAttribute("r","0.7"); gAnchor.appendChild(d); }
+  svg.append(gCarrier, gPaint, border, gHit, gFreeHit, gAnchor, rubber);
+  gAnchor.style.display = showAnchors() ? "" : "none";
+  $("stage").appendChild(svg);
+  applyZoom(); redrawPaint(); updateInfo();
+  gCarrier.style.display = $("showCarrier").checked ? "" : "none";
+}
+const showAnchors=()=> $("showAnchors").checked && (+$("subV").value>1 || +$("subD").value>1 || free.length>0 || pending);
+const pairKey=(a,b)=> a<b ? a+"|"+b : b+"|"+a;
+const slotSide=(n)=> n===0 ? 0 : (n%2 ? Math.ceil(n/2) : -n/2);
+function offsetLine(x1,y1,x2,y2,n){ const off=+$("lineOff").value; const dx=x2-x1, dy=y2-y1, len=Math.hypot(dx,dy)||1, s=slotSide(n); const ox=-dy/len*s*off, oy=dx/len*s*off; return [x1+ox,y1+oy,x2+ox,y2+oy]; }
+/* lines that share the same two anchors sit side by side: slot 0 on the line, then ±1, ±2 … times the stroke */
+function freeGeometry(pw){
+  const byId=new Map(L.segs.map(s=>[s.id,s])); const taken=new Map();                 // pair key → slots used
+  for(const [id,cols] of paint){ const sg=byId.get(id); if(sg) taken.set(pairKey(sg.aId,sg.bId),cols.length); }
+  const out=[];
+  for(const f of free){ const A=L.anchors.get(f.a), B=L.anchors.get(f.b); if(!A||!B) continue;
+    const k=pairKey(f.a,f.b), n=taken.get(k)||0; taken.set(k,n+1);
+    const [x1,y1,x2,y2]=offsetLine(A.x,A.y,B.x,B.y,n);
+    out.push({f, x1, y1, x2, y2}); }
+  return out;
+}
+function redrawPaint(){
+  gPaint.innerHTML=""; gFreeHit.innerHTML="";
+  const pw=+$("pw").value||1.3; const byId=new Map(L.segs.map(s=>[s.id,s]));
+  for(const [id,cols] of paint){ const sg=byId.get(id); if(!sg) continue;
+    cols.forEach((col,n)=>{ const [x1,y1,x2,y2]=offsetLine(sg.x1,sg.y1,sg.x2,sg.y2,n);
+      const l=document.createElementNS(NS,"line"); l.setAttribute("x1",x1.toFixed(2)); l.setAttribute("y1",y1.toFixed(2)); l.setAttribute("x2",x2.toFixed(2)); l.setAttribute("y2",y2.toFixed(2));
+      l.setAttribute("stroke",col); l.setAttribute("stroke-width",pw); l.dataset.id=id; gPaint.appendChild(l); }); }
+  for(const g of freeGeometry(pw)){
+    const l=document.createElementNS(NS,"line"); l.setAttribute("x1",g.x1.toFixed(2)); l.setAttribute("y1",g.y1.toFixed(2)); l.setAttribute("x2",g.x2.toFixed(2)); l.setAttribute("y2",g.y2.toFixed(2));
+    l.setAttribute("stroke",g.f.colour); l.setAttribute("stroke-width",pw); gPaint.appendChild(l);
+    const h=document.createElementNS(NS,"line"); h.setAttribute("class","freeHit"); h.setAttribute("x1",g.x1.toFixed(2)); h.setAttribute("y1",g.y1.toFixed(2)); h.setAttribute("x2",g.x2.toFixed(2)); h.setAttribute("y2",g.y2.toFixed(2)); h.dataset.fid=g.f.id; gFreeHit.appendChild(h); }
+  if(gAnchor) gAnchor.style.display = showAnchors() ? "" : "none";
+  updateInfo();
+}
+function applyZoom(){ const z=+$("zoom").value; const stage=$("stage"); const box=stage.getBoundingClientRect(); const s=Math.min(box.width-40, box.height-40)*z; svg.style.width=s+"px"; svg.style.height=s*(L.H/L.W)+"px";
+  if(z>1){ stage.style.justifyContent="flex-start"; stage.style.alignItems="flex-start"; stage.style.position="relative"; stage.style.minHeight="100%"; stage.style.padding="20px"; } else { stage.style.justifyContent="center"; stage.style.alignItems="center"; stage.style.padding="0"; } }
+function updateInfo(){
+  $("latInfo").textContent=`${L.lines.length} lines · ${L.segs.length} segments\nangle ${L.angle.toFixed(2)}° · node rows every ${L.rowPitch.toFixed(2)} cm (${L.nRows} rows)`;
+  let n=0, len=0; const byId=new Map(L.segs.map(s=>[s.id,s]));
+  for(const [id,cols] of paint){ const s=byId.get(id); if(s){ n+=cols.length; len+=cols.length*Math.hypot(s.x2-s.x1,s.y2-s.y1); } }
+  let stale=0; for(const [id,cols] of paint) if(!byId.has(id)) stale+=cols.length;
+  let flen=0; for(const f of free){ const A=L.anchors.get(f.a), B=L.anchors.get(f.b); if(A&&B) flen+=Math.hypot(B.x-A.x,B.y-A.y); }
+  $("paintInfo").textContent=`${n-stale} painted segments · ${(len/100).toFixed(1)} m · ${free.length} free lines · ${(flen/100).toFixed(1)} m`+(stale?`\n${stale} painted segments belong to another carrier/pitch (kept, not shown, not saved)`:"")+(pending?"\nfree line: click another anchor to place it, esc to cancel":"");
+}
+
+/* ───────── painting ───────── */
+/* mode "add": add the colour to the segment (once); mode "remove": take that colour off; eraser removes everything */
+function setSeg(id,col,mode){ const cols=paint.get(id)||[];
+  if(col===null){ paint.delete(id); return; }
+  if(mode==="remove"){ const rest=cols.filter(c=>c!==col); if(rest.length) paint.set(id,rest); else paint.delete(id); }
+  else if(!cols.includes(col)) paint.set(id,[...cols,col]); }
+function snapshot(){ undoStack.push({paint:new Map([...paint].map(([k,v])=>[k,[...v]])), free:free.map(f=>({...f}))}); if(undoStack.length>200) undoStack.shift(); }
+let dragging=false, dragMode="add";      // "add" or "remove" for the whole drag, with the current colour (null = eraser)
+function paintAt(el, whole){
+  if(!el || !el.dataset.id) return;
+  if(whole){ for(const sg of L.segs) if(sg.line===el.dataset.line) setSeg(sg.id, colour, dragMode); }
+  else setSeg(el.dataset.id, colour, dragMode);
+}
+function onDown(e){
+  const an=e.target.closest(".anchorHit");
+  if(an){ e.preventDefault();
+    if(!pending){ pending={a:an.dataset.aid}; const A=L.anchors.get(pending.a); rubber.setAttribute("x1",A.x); rubber.setAttribute("y1",A.y); rubber.setAttribute("x2",A.x); rubber.setAttribute("y2",A.y); rubber.setAttribute("stroke",colour||"#888"); rubber.setAttribute("stroke-width",+$("pw").value||1.3); rubber.style.display=""; redrawPaint(); return; }
+    const b=an.dataset.aid; if(b!==pending.a && colour!==null){ snapshot(); free.push({id:"F"+(freeSeq++), a:pending.a, b, colour}); }
+    pending=null; rubber.style.display="none"; redrawPaint(); save(); return; }
+  const fh=e.target.closest(".freeHit");
+  if(fh){ e.preventDefault(); const f=free.find(q=>q.id===fh.dataset.fid); if(!f) return; snapshot();
+    if(colour===null || f.colour===colour) free=free.filter(q=>q!==f); else f.colour=colour;
+    redrawPaint(); save(); return; }
+  if(pending){ pending=null; rubber.style.display="none"; redrawPaint(); }
+  const el=e.target.closest(".hit"); if(!el) return;
+  e.preventDefault(); snapshot();
+  const cur=paint.get(el.dataset.id)||[];
+  dragMode = (colour!==null && cur.includes(colour)) ? "remove" : "add";   // the same colour again takes that colour off
+  dragging=true; paintAt(el, e.shiftKey); redrawPaint();
+}
+function svgPoint(e){ const pt=svg.createSVGPoint(); pt.x=e.clientX; pt.y=e.clientY; const q=pt.matrixTransform(svg.getScreenCTM().inverse()); return [q.x,q.y]; }
+function onMove(e){
+  if(pending && svg){ const [x,y]=svgPoint(e); const an=e.target.closest(".anchorHit"); const A = an ? L.anchors.get(an.dataset.aid) : null; rubber.setAttribute("x2", A?A.x:x); rubber.setAttribute("y2", A?A.y:y); }
+  const el=e.target.closest(".hit"); if(el){ const sg=L.segs.find(s=>s.id===el.dataset.id); $("hud").textContent=`${el.dataset.id}  ${(sg.x1/100).toFixed(2)},${(sg.y1/100).toFixed(2)} → ${(sg.x2/100).toFixed(2)},${(sg.y2/100).toFixed(2)} m`; }
+  if(!dragging) return; if(el){ paintAt(el, e.shiftKey); redrawPaint(); } }
+function onUp(){ dragging=false; save(); }
+document.addEventListener("pointerdown",onDown); document.addEventListener("pointermove",onMove); document.addEventListener("pointerup",onUp);
+document.addEventListener("keydown",e=>{ if(e.target.tagName==="INPUT"||e.target.tagName==="SELECT") return;
+  if(e.key==="Escape" && pending){ pending=null; rubber.style.display="none"; redrawPaint(); }
+  if(e.key==="z"){ undo(); } if(e.key==="0"){ pick(null); } const k=parseInt(e.key); if(k>=1&&k<=PALETTE.length) pick(PALETTE[k-1][0]); });
+function undo(){ if(!undoStack.length) return; const u=undoStack.pop(); paint=u.paint; free=u.free; redrawPaint(); save(); }
+function pick(col){ colour=col; document.querySelectorAll(".sw").forEach(s=>s.classList.toggle("on", (s.dataset.col||null)===col)); }
+(function swatches(){ const box=$("swatches");
+  PALETTE.forEach(([c,name],i)=>{ const d=document.createElement("div"); d.className="sw"; d.style.background=c; d.dataset.col=c; d.title=`${name} (${i+1})`; d.onclick=()=>pick(c); box.appendChild(d); });
+  const er=document.createElement("div"); er.className="sw erase"; er.title="eraser (0)"; er.onclick=()=>pick(null); box.appendChild(er); pick(PALETTE[0][0]); })();
+
+/* ───────── save / load ───────── */
+const KEY="latticeEditor.v1";
+function params(){ return {kind:$("kind").value, angle:+$("angle").value, pitch:+$("pitch").value, W:+$("wallW").value, H:+$("wallH").value, snap:$("snap").checked, pw:+$("pw").value, lineOff:+$("lineOff").value, subV:+$("subV").value||1, subD:+$("subD").value||1}; }
+/* painted ids that no longer exist on the current lattice (after a rebuild with another carrier) are skipped, never fatal */
+function designJSON(){ const byId=new Map(L.segs.map(s=>[s.id,s])); const segments=[];
+  for(const [id,cols] of paint){ const s=byId.get(id); if(!s) continue; cols.forEach((col,n)=> segments.push({id,colour:col, slot:n, sub:s.sub||1, x1_m:+(s.x1/100).toFixed(4), y1_m:+(s.y1/100).toFixed(4), x2_m:+(s.x2/100).toFixed(4), y2_m:+(s.y2/100).toFixed(4)})); }
+  const lines=[]; for(const f of free){ const A=L.anchors.get(f.a), B=L.anchors.get(f.b); if(!A||!B) continue; lines.push({id:f.id, colour:f.colour, a:f.a, b:f.b, x1_m:+(A.x/100).toFixed(4), y1_m:+(A.y/100).toFixed(4), x2_m:+(B.x/100).toFixed(4), y2_m:+(B.y/100).toFixed(4)}); }
+  return {version:2, lattice:params(), latticeResolved:{angle:L.angle,rowPitch:L.rowPitch,nRows:L.nRows}, segments, lines}; }
+function save(){ try{ localStorage.setItem(KEY, JSON.stringify({params:params(), paint:[...paint], free, freeSeq})); }catch(e){} }
+function restore(){ try{ const v=JSON.parse(localStorage.getItem(KEY)||"null"); if(!v) return false;
+  for(const k of ["kind","angle","pitch","W","H","pw","lineOff","subV","subD"]){ const el=$({kind:"kind",angle:"angle",pitch:"pitch",W:"wallW",H:"wallH",pw:"pw",lineOff:"lineOff",subV:"subV",subD:"subD"}[k]); if(v.params[k]!=null) el.value=v.params[k]; } $("snap").checked=!!v.params.snap;
+  L=buildLattice(params()); paint=new Map((v.paint||[]).map(([k,c])=>[k, Array.isArray(c)?c:[c]])); free=v.free||[]; freeSeq=v.freeSeq||(free.length+1); return true; }catch(e){ return false; } }
+function dl(name,text,type){ try{ const b=new Blob([text],{type}); const u=URL.createObjectURL(b); const a=document.createElement("a"); a.href=u; a.download=name; document.body.appendChild(a); a.click(); setTimeout(()=>{URL.revokeObjectURL(u);a.remove();},500); }
+  catch(err){ alert("could not save: "+err.message); } }
+window.addEventListener("error",e=>{ $("paintInfo").textContent="error: "+e.message; });
+function stamp(){ const d=new Date(); return `lattice-design_${d.toISOString().slice(0,10)}_${String(d.getHours()).padStart(2,"0")}${String(d.getMinutes()).padStart(2,"0")}`; }
+$("saveSvg").onclick=()=>{ try{
+  const W=L.W*100, H=L.H*100, pw=+$("pw").value||1.3;
+  const o=[`<?xml version="1.0" encoding="UTF-8"?>`,
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${W}cm" height="${H}cm" viewBox="0 0 ${W} ${H}">`,
+    `<metadata>${JSON.stringify(designJSON())}</metadata>`,
+    `<rect width="${W}" height="${H}" fill="none" stroke="#0d0b09" stroke-width="0.4"/>`,
+    `<g id="carrier" fill="none" stroke="#0d0b09" stroke-width="0.25">`];
+  for(const ln of L.lines) o.push(`<polyline id="${ln.id}" points="${ln.pts.map(q=>q[0].toFixed(2)+","+q[1].toFixed(2)).join(" ")}"/>`);
+  o.push(`</g><g id="design" fill="none" stroke-linecap="round" stroke-width="${pw}">`);
+  const byId=new Map(L.segs.map(s=>[s.id,s]));
+  for(const [id,cols] of paint){ const s=byId.get(id); if(!s) continue; cols.forEach((col,n)=>{ const [x1,y1,x2,y2]=offsetLine(s.x1,s.y1,s.x2,s.y2,n); o.push(`<line id="${id}${n?"#"+n:""}" stroke="${col}" x1="${x1.toFixed(2)}" y1="${y1.toFixed(2)}" x2="${x2.toFixed(2)}" y2="${y2.toFixed(2)}"/>`); }); }
+  for(const g of freeGeometry(pw)) o.push(`<line id="${g.f.id}" class="free" stroke="${g.f.colour}" x1="${g.x1.toFixed(2)}" y1="${g.y1.toFixed(2)}" x2="${g.x2.toFixed(2)}" y2="${g.y2.toFixed(2)}"/>`);
+  o.push(`</g></svg>`);
+  dl(stamp()+".svg", o.join("\n"), "image/svg+xml");
+  }catch(err){ alert("could not build the SVG: "+err.message); } };
+$("saveJson").onclick=()=>{ try{ dl(stamp()+".json", JSON.stringify(designJSON(),null,1), "application/json"); }catch(err){ alert("could not build the JSON: "+err.message); } };
+$("loadJson").onclick=()=> $("file").click();
+$("file").onchange=(e)=>{ const f=e.target.files[0]; if(!f) return; const rd=new FileReader(); rd.onload=()=>{ try{ const j=JSON.parse(rd.result); const p=j.lattice||{};
+  $("kind").value=p.kind||"xx"; $("angle").value=p.angle||45; $("pitch").value=p.pitch||20; $("wallW").value=p.W||7; $("wallH").value=p.H||7; $("snap").checked=p.snap!==false; if(p.pw) $("pw").value=p.pw; if(p.lineOff!=null) $("lineOff").value=p.lineOff; $("subV").value=p.subV||1; $("subD").value=p.subD||1;
+  L=buildLattice(params()); paint=new Map(); for(const sg of (j.segments||[])){ const cols=paint.get(sg.id)||[]; if(!cols.includes(sg.colour)) cols.push(sg.colour); paint.set(sg.id,cols); }
+  free=(j.lines||[]).map(l=>({id:l.id, a:l.a, b:l.b, colour:l.colour})); freeSeq=free.length+1; undoStack=[]; render(); save(); }catch(err){ alert("not a lattice design file"); } }; rd.readAsText(f); e.target.value=""; };
+
+/* ───────── wiring ───────── */
+$("rebuild").onclick=()=>{ snapshot(); pending=null; L=buildLattice(params()); render(); save(); };
+/* any lattice number or select rebuilds when auto rebuild is on (debounced, so typing a number does not rebuild per keystroke) */
+let rebuildTimer=null;
+const autoRebuild=()=>{ if(!$("autoRebuild").checked) return; clearTimeout(rebuildTimer); rebuildTimer=setTimeout(()=>$("rebuild").onclick(), 250); };
+for(const id of ["kind","angle","pitch","wallW","wallH","snap","subV","subD"]){ const el=$(id); el.addEventListener("input",autoRebuild); el.addEventListener("change",autoRebuild); }
+$("clear").onclick=()=>{ snapshot(); paint.clear(); free=[]; redrawPaint(); save(); };
+$("showAnchors").onchange=()=>redrawPaint();
+
+$("undo").onclick=undo;
+$("zoom").oninput=applyZoom;
+$("pw").oninput=$("lineOff").oninput=()=>{ redrawPaint(); save(); };
+$("showCarrier").onchange=()=>{ gCarrier.style.display=$("showCarrier").checked?"":"none"; };
+window.addEventListener("resize",applyZoom);
+if(!restore()) L=buildLattice(params());
+render();
+</script>
+</body>
+</html>
