@@ -46,6 +46,44 @@ hanging mass from ~275 kg to **~300–365 kg (43–52 kg per metre of beam)**, a
 longest cuts reach 14–19 m. Fewer weft rows, or *chain* instead of *all*, brings
 it back. This is reported, not hidden.
 
+## Structure — no corner in mid-air
+
+Two things the first grid version got wrong (your screenshots): runs that ended on
+a strand with no cables left, leaving a 90° corner hanging in mid-air; and whole
+bundles stepping sideways with nothing to turn against. The generator now
+enforces a **support rule** on the grid, with real physics behind it:
+
+- A column is **anchored** at a row if a strand with cables arrives there
+  vertically (it does not move that row). Plain ground strands are permanent
+  anchors as long as they carry cables.
+- A hanging net has no bottom beam, so a rib is only a structural member if it
+  is tensioned — between anchors and, with **edge rails**, the wall. `rib
+  pretension` is what you would tension each rib to between the rails (default
+  250 N); the rails need a tie point at every row on both edges (`rail ties`).
+- Every 90° corner must sit on an anchor, or on a rib where the sag it causes,
+  **W·a·b / (T·L)**, stays under `allowed rib sag` (default 40 mm). W is what that
+  bundle still carries below the row (14 cables near the beam pull ≈ 55 N; one
+  cable near the floor ≈ 1 N), a and b the distances to the nearest anchors.
+- Moves that cannot be supported are shortened toward the strand's own column
+  (`moves shortened for support`). A run may only land on a strand that still
+  has cables. After the ribs are built the app checks that a rib really exists
+  under every rib-held corner; any that fail are `corners without support`,
+  drawn as red ✕ in the Technical view. Expect a few dozen, all in the lowest
+  rows where the ribs have run out of cables.
+
+What this taught us, measured: with no fixed column between tiles even 600 N
+ribs leave half the motif frozen near the beam; **one plain anchor strand between
+tiles** at 250 N frees it almost completely (84 of ~2,300 moves shortened). The
+anchor column is the structure; the rib tension is secondary.
+
+## Layout — tile or strip
+
+*composition* = **tile one motif across the wall** repeats a single lexicon motif
+across the full width, each column shifted down by *stagger* rows, with *ground
+between* plain anchor strands. Homogeneous, repetitive, anchors everywhere — the
+current direction, not strictly sadu. **sadu strip** is the borders-and-centre
+composition described below.
+
 ## How the model follows the loom
 
 The description has three layers; the code has those, plus the weft you asked for:
@@ -130,12 +168,27 @@ forever.
 
 ## Favourites and Evolve
 
-**Randomise all** draws every *design* variable over its full range — grid on/off
+**Randomise** follows the preset dropdown. With a preset selected it randomises
+**within that family**: the layout, the tile motif (or the border motifs and
+centre glyphs of a strip), the grid and the rails stay; stagger, gaps, pairs per
+column, chart scale, twine, γ, tails, bulb clearances, rib runs, tension and sag
+vary — inside ranges measured to keep the ribs continuous (one cable per run,
+runs of 6–8 cells, a new run every ⅓–½ run; two cables per run or short tight
+runs deplete the strands and leave corners without a rib). Choose *— any style —*
+at the top of the dropdown for the full-range draw below. Favourites and the
+seen-log record the family.
+
+**Randomise all** (any style) draws every *design* variable over its full range — grid on/off
 and pitch, max run, lane offset, rows, chart scale, twine, mirroring, γ, tails,
 top clearance, every weft/rib setting, borders, centre glyphs. Wall size, cable
 count, Ø, g/m and bulb mass are facts and stay put.
 
 **★ Save** (or `s`) stores the full composition, every metric and a thumbnail.
+*clear saved favourites* removes them all from this browser (after a confirm —
+export first); *clear seen-log* forgets the randomise history.
+
+Snapshots of earlier versions live in `saved designs/`: `v2-field-model/` and
+`v3-grid-ribs-2026-09-11/` (the grid + ribs version before the support rule).
 Every *Randomise all* / *New seed* is logged as *seen*, so the export carries the
 liked set and the passed-over set. **Evolve** shows a 5×5 map of mutants around the
 current design; the axes are the two principal directions along which your saved

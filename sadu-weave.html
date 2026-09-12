@@ -124,8 +124,9 @@
     <select id="preset"></select>
     <div class="btnrow">
       <button id="btnRand">⟳ New seed</button>
-      <button id="btnRandAll" title="every design variable, full range — wall &amp; cable facts stay">⚄ Randomise all</button>
+      <button id="btnRandAll">⚄ Randomise all</button>
     </div>
+    <p class="note" id="randNote"></p>
     <label class="row"><span>seed</span><input type="number" id="seed" style="flex:0 0 110px"></label>
 
     <h2>Favourites <span id="favCount" style="float:right;text-transform:none;letter-spacing:0;color:var(--accent)"></span></h2>
@@ -164,13 +165,15 @@
     <label class="row"><span>grid pitch</span><input type="range" id="gridPitch" min="0.05" max="0.3" step="0.005"><b class="val"></b></label>
     <label class="row"><span>max run per row</span><input type="range" id="maxStep" min="1" max="6" step="1"><b class="val"></b></label>
     <label class="row"><span>lane offset</span><input type="range" id="laneOff" min="0" max="0.05" step="0.0025"><b class="val"></b></label>
-    <label class="row"><span>heavy corner on rib within</span><input type="range" id="maxSpan" min="1" max="10" step="1"><b class="val"></b></label>
-    <label class="row"><span>heavy means pull ≥</span><input type="range" id="heavyN" min="2" max="60" step="1"><b class="val"></b></label>
-    <p class="note"><b>Support rule.</b> Every 90° corner must sit on an <i>anchored</i> column — a strand whose cables
-      arrive vertically at that row — or on a rib tied to anchored strands on both sides. A <i>heavy</i> corner (a
-      bundle pulling ≥ the threshold) needs its anchors within this many cells; a light one (a few cables near
-      the floor) may sit twice as far from them. Moves that cannot be supported are shortened; a run may only
-      land on a strand that still has cables. Corners that still fail are counted and drawn as red ✕.</p>
+    <label class="row"><span>edge rails (ribs tied to the wall)</span><input type="checkbox" id="edgeRails" style="flex:0 0 auto"></label>
+    <label class="row"><span>rib pretension</span><input type="range" id="ribTension" min="20" max="600" step="10"><b class="val"></b></label>
+    <label class="row"><span>allowed rib sag</span><input type="range" id="maxSag" min="5" max="150" step="5"><b class="val"></b></label>
+    <p class="note"><b>Support rule.</b> A hanging net has no bottom beam, so a rib is only a structural member if it
+      is tensioned — between the strands whose cables arrive vertically that row (<i>anchors</i>) and, with edge
+      rails, the wall. Every 90° corner must sit on an anchor, or on a rib where the sag it causes,
+      W·a·b / (T·L), stays under the allowed sag — W is what that bundle still carries, a and b the distances to
+      the nearest anchors. Moves that cannot be supported are shortened; a run may only land on a strand that
+      still has cables. Corners that still fail are counted and drawn as red ✕.</p>
     <p class="note" id="gridNote"></p>
     <label class="row"><span>tie rows (picks)</span><input type="range" id="rows" min="8" max="140" step="1"><b class="val"></b></label>
     <label class="row"><span>lowest tie</span><input type="range" id="maxDepth" min="1" max="14" step="0.1"><b class="val"></b></label>
@@ -206,6 +209,22 @@
     <label class="row"><span>span</span>
       <select id="weftSpan" style="flex:0 0 150px"><option value="wall">whole wall</option><option value="band">within each band</option></select></label>
 
+    <h2>Layout</h2>
+    <label class="row"><span>composition</span>
+      <select id="layout" style="flex:0 0 190px"><option value="tile">tile one motif across the wall</option><option value="sadu">sadu strip — borders + centre, mirrored</option></select></label>
+    <div id="tileBox" class="band">
+      <div class="bhead"><select id="tileMotif"></select></div>
+      <div class="grid">
+        <label>pairs/col<input type="number" id="tileDup" min="1" max="4" step="1"></label>
+        <label>ground between<input type="number" id="tileGap" min="0" max="6" step="1"></label>
+        <label>stagger rows<input type="number" id="tileStagger" min="0" max="16" step="1"></label>
+      </div>
+      <p class="note" style="margin:4px 0 0">One motif repeated across the whole width, each column of it shifted
+        down by <i>stagger</i> rows from its neighbour. <i>ground between</i> ≥ 1 puts a plain strand between
+        tiles that never moves — the anchor the ribs pull against. Without it, heavy bundles near the beam have
+        nothing within reach and the support rule freezes them.</p>
+    </div>
+    <div id="saduBox">
     <h2>Borders <span style="float:right;text-transform:none;letter-spacing:0">outside → centre</span></h2>
     <div id="borders"></div>
     <div class="btnrow"><button id="btnAddBorder">+ border band</button></div>
@@ -226,6 +245,7 @@
       plain warp columns (straight, untwined strands) between a band and the next. The centre is the free band: a
       sequence of discrete glyphs separated by ground, read like a line of text. Ground rows spread the strands
       evenly; glyph rows gather them.</p>
+    </div>
 
     <h2>Bulb drop</h2>
     <label class="row"><span>depth profile γ</span><input type="range" id="shedGamma" min="0.35" max="3" step="0.05"><b class="val"></b></label>
@@ -427,43 +447,66 @@ const GLYPH_KEYS=Object.keys(GLYPHS);
 /* ───────── presets ───────── */
 const bd=(motif,dup,gap,phase)=>({motif,dup:dup||1,gap:gap==null?1:gap,phase:phase|0});
 const PRESETS = {
+  "Eye lattice":     { layout:"tile", tile:{motif:"ein",     dup:1, gap:1, stagger:3}, grid:true, gridPitch:0.10, maxStep:2, laneOff:0.02, margin:0, rowScale:1, twine:1, twinePer:4, mirror:true, maxAng:45,
+    weftEvery:1, weftPhase:0, weftFloat:6, weftStep:3, weftJitter:0, weftHops:1, weftSag:0, weftSpan:"wall", weftMax:4, edgeRails:true, ribTension:250, maxSag:40,
+    borders:[], centre:{glyphs:["bigDiamond"],gap:2,dup:1,rowScale:1,fit:true}},
+  "Diamond net":     { layout:"tile", tile:{motif:"zigzag",  dup:1, gap:1, stagger:4}, grid:true, gridPitch:0.10, maxStep:2, laneOff:0.02, margin:0, rowScale:1, twine:1, twinePer:4, mirror:true, maxAng:45,
+    weftEvery:1, weftPhase:0, weftFloat:6, weftStep:3, weftJitter:0, weftHops:1, weftSag:0, weftSpan:"wall", weftMax:4, edgeRails:true, ribTension:250, maxSag:40,
+    borders:[], centre:{glyphs:["bigDiamond"],gap:2,dup:1,rowScale:1,fit:true}},
+  "Pebble field":    { layout:"tile", tile:{motif:"uwairjan",dup:1, gap:1, stagger:2}, grid:true, gridPitch:0.10, maxStep:1, laneOff:0.02, margin:0, rowScale:2, twine:1, twinePer:4, mirror:true, maxAng:45,
+    weftEvery:1, weftPhase:0, weftFloat:6, weftStep:3, weftJitter:0, weftHops:1, weftSag:0, weftSpan:"wall", weftMax:4, edgeRails:true, ribTension:250, maxSag:40,
+    borders:[], centre:{glyphs:["bigDiamond"],gap:2,dup:1,rowScale:1,fit:true}},
+  "Cross net":       { layout:"tile", tile:{motif:"cross",   dup:1, gap:1, stagger:2}, grid:true, gridPitch:0.10, maxStep:2, laneOff:0.02, margin:0, rowScale:1, twine:1, twinePer:4, mirror:true, maxAng:45,
+    weftEvery:1, weftPhase:0, weftFloat:6, weftStep:3, weftJitter:0, weftHops:1, weftSag:0, weftSpan:"wall", weftMax:4, edgeRails:true, ribTension:250, maxSag:40,
+    borders:[], centre:{glyphs:["bigDiamond"],gap:2,dup:1,rowScale:1,fit:true}},
+  "Fir forest":      { layout:"tile", tile:{motif:"shajar",  dup:1, gap:1, stagger:2}, grid:true, gridPitch:0.10, maxStep:2, laneOff:0.02, margin:0, rowScale:2, twine:1, twinePer:4, mirror:true, maxAng:45,
+    weftEvery:1, weftPhase:0, weftFloat:6, weftStep:3, weftJitter:0, weftHops:1, weftSag:0, weftSpan:"wall", weftMax:4, edgeRails:true, ribTension:250, maxSag:40,
+    borders:[], centre:{glyphs:["bigDiamond"],gap:2,dup:1,rowScale:1,fit:true}},
   "Sadu strip (default)":{
+    layout:"sadu", edgeRails:true, ribTension:250, maxSag:40,
     rows:32, rowScale:1, twine:0.6, twinePer:4, mirror:true, maxAng:45,
-    grid:true, gridPitch:0.10, maxStep:2, laneOff:0.02, maxSpan:5, heavyN:15, margin:0,
+    grid:true, gridPitch:0.10, maxStep:2, laneOff:0.02, edgeRails:true, ribTension:250, maxSag:40,
+    grid:true, gridPitch:0.10, maxStep:2, laneOff:0.02, margin:0,
     weftEvery:1, weftPhase:0, weftFloat:6, weftStep:3, weftJitter:0, weftHops:1, weftSag:0, weftSpan:"wall",
     borders:[bd("stripe",2,1),bd("zigzag",1,1),bd("ein",1,1),bd("dhurs",1,1),bd("uwairjan",1,2)],
     centre:{glyphs:["bigDiamond","tree","nested"],gap:3,dup:2,rowScale:2,fit:true}},
   "Columns of eyes":{
+    layout:"sadu", edgeRails:true, ribTension:250, maxSag:40,
     rows:36, rowScale:1, twine:0.6, twinePer:4, mirror:true, maxAng:45,
     grid:true, gridPitch:0.10, maxStep:2, laneOff:0.02, margin:0,
-    weftEvery:1, weftPhase:0, weftFloat:1, weftStep:1, weftJitter:0, weftHops:1, weftSag:0.02, weftSpan:"band",
+    weftEvery:1, weftPhase:0, weftFloat:6, weftStep:3, weftJitter:0, weftHops:1, weftSag:0.02, weftSpan:"wall",
     borders:[bd("zigzag",1,1),bd("ein",1,1),bd("zigzag",1,1),bd("diamond",1,1),bd("ein",1,1)],
     centre:{glyphs:["solid","solid","solid"],gap:2,dup:1,rowScale:2,fit:true}},
   "Big shajarah":{
+    layout:"sadu", edgeRails:true, ribTension:250, maxSag:40,
     rows:34, rowScale:1, twine:0.55, twinePer:4, mirror:true, maxAng:45,
     grid:true, gridPitch:0.12, maxStep:3, laneOff:0.02, margin:0,
     weftEvery:1, weftPhase:0, weftFloat:8, weftStep:4, weftJitter:0, weftHops:1, weftSag:0.04, weftSpan:"wall",
     borders:[bd("dhurs",1,1),bd("ein",1,1),bd("hubub",1,2)],
     centre:{glyphs:["nested","solid"],gap:2,dup:3,rowScale:3,fit:true}},
   "Ribs and seeds":{
+    layout:"sadu", edgeRails:true, ribTension:250, maxSag:40,
     rows:40, rowScale:1, twine:0.7, twinePer:3, mirror:true, maxAng:45,
     grid:true, gridPitch:0.10, maxStep:1, laneOff:0.02, margin:0,
-    weftEvery:1, weftPhase:0, weftFloat:1, weftStep:1, weftJitter:0, weftHops:1, weftSag:0.02, weftSpan:"wall",
+    weftEvery:1, weftPhase:0, weftFloat:6, weftStep:3, weftJitter:0, weftHops:1, weftSag:0.02, weftSpan:"wall",
     borders:[bd("hubub",1,1),bd("dealla",1,1),bd("hubub",1,1),bd("ladder",1,1),bd("dealla",1,2)],
     centre:{glyphs:["comb","bars","comb","bars"],gap:3,dup:2,rowScale:1,fit:true}},
   "Teeth border":{
+    layout:"sadu", edgeRails:true, ribTension:250, maxSag:40,
     rows:32, rowScale:1, twine:0.6, twinePer:5, mirror:true, maxAng:45,
     grid:true, gridPitch:0.10, maxStep:2, laneOff:0.02, margin:0,
     weftEvery:1, weftPhase:0, weftFloat:5, weftStep:2, weftJitter:0.3, weftHops:1, weftSag:0.03, weftSpan:"wall",
     borders:[bd("stripe",3,1),bd("dhurs",1,0),bd("teethIn",1,1),bd("vees",1,2)],
     centre:{glyphs:["steps","hourglass","steps"],gap:3,dup:2,rowScale:1,fit:true}},
   "Sparse stripes":{
+    layout:"sadu", edgeRails:true, ribTension:250, maxSag:40,
     rows:28, rowScale:2, twine:0.5, twinePer:4, mirror:true, maxAng:40,
     grid:true, gridPitch:0.125, maxStep:2, laneOff:0.025, margin:0,
     weftEvery:1, weftPhase:0, weftFloat:10, weftStep:5, weftJitter:0, weftHops:1, weftSag:0.05, weftSpan:"wall",
     borders:[bd("stripe",2,3),bd("cross",1,3),bd("stripe",2,3)],
     centre:{glyphs:["bigDiamond"],gap:6,dup:2,rowScale:3,fit:true}},
   "Asymmetric strip":{
+    layout:"sadu", edgeRails:true, ribTension:250, maxSag:40,
     rows:34, rowScale:1, twine:0.6, twinePer:4, mirror:false, maxAng:45,
     grid:true, gridPitch:0.10, maxStep:2, laneOff:0.02, margin:0,
     weftEvery:1, weftPhase:0, weftFloat:6, weftStep:2, weftJitter:0.3, weftHops:1, weftSag:0.03, weftSpan:"wall",
@@ -475,7 +518,8 @@ const PRESETS = {
 const P = {
   seed:12345, width:7, height:7, count:1000, dia:5.5, gpm:40, bulbMass:120,
   rows:32, maxDepth:6.9, margin:0, maxAng:45, snap:0, pack:1,
-  grid:true, gridPitch:0.10, maxStep:2, laneOff:0.02,
+  grid:true, gridPitch:0.10, maxStep:2, laneOff:0.02, edgeRails:true, ribTension:250, maxSag:40,
+  layout:"tile", tile:{motif:"ein", dup:1, gap:1, stagger:3},
   rowScale:1, twine:1.0, twinePer:4, mirror:true,
   weftEvery:1, weftPhase:0, weftFloat:6, weftStep:3, weftJitter:0, weftHops:1, weftSag:0.0, weftSpan:"wall", weftMax:4,
   shedGamma:0.75, tailFactor:1.4, bnTries:14, topClear:0.4, minGap:60,
@@ -507,6 +551,21 @@ function centreRows(P, Reff){
 /* lay the bands out left → right: borders, centre, mirrored borders */
 function compose(P, padTo, Reff){
   const seq=[]; let cols=0;
+  if(P.layout==="tile"){
+    /* one motif across the whole width, columns staggered down by `stagger` rows */
+    const m=LEX[P.tile.motif]||LEX.ein, k=m.rows[0].length, dup=Math.max(1,P.tile.dup|0), gap=Math.max(0,P.tile.gap|0), st=Math.max(0,P.tile.stagger|0);
+    const target=Math.max(k*dup, padTo|0 || Math.round(P.width/0.1));
+    let i=0;
+    while(cols + k*dup <= target){
+      seq.push({id:seq.length, rows:m.rows, k, dup, cols:k*dup, c0:cols, mirror:false, isCentre:false, isGround:false,
+                phase:i*st, rs:Math.max(1,P.rowScale|0), name:P.tile.motif}); cols+=k*dup;
+      if(gap && cols+gap<=target){ seq.push({id:seq.length, rows:["1".repeat(gap)], k:gap, dup:1, cols:gap, c0:cols, mirror:false, isCentre:false, isGround:true, phase:0, rs:1, name:"ground"}); cols+=gap; }
+      i++;
+    }
+    const rest=target-cols;
+    if(rest>0){ seq.push({id:seq.length, rows:["1".repeat(rest)], k:rest, dup:1, cols:rest, c0:cols, mirror:false, isCentre:false, isGround:true, phase:0, rs:1, name:"ground"}); cols+=rest; }
+    return {seq, cols:Math.max(1,cols), compCols:cols};
+  }
   const push=(spec,rows,mirror,isCentre,name,isGround)=>{
     const k=rows[0].length, dup=Math.max(1,spec.dup|0);
     seq.push({id:seq.length, rows,k,dup,cols:k*dup,c0:cols,mirror,isCentre,isGround:!!isGround,phase:spec.phase|0,
@@ -655,7 +714,7 @@ function generate(P){
   const raster=new Uint8Array(L.cols*(R+1));               // the chart as woven, for display/export
   const nsAt = new Int32Array(R+1).fill(S);
   const crossings=[]; let cableCross=0, maxAngle=0, runCells=0, runs=0, runLen=0;
-  const corners=[]; let supportLimited=0, unsupported=0, ribCorners=0, maxAnchorGap=0;
+  const corners=[]; let supportLimited=0, unsupported=0, ribCorners=0, maxAnchorGap=0, maxSag=0, ribBroken=0, railTies=0;
   /* ── weft: cables that travel across ── */
   const hops=[]; let weftRows=0, weftCables=0, weftLen=0, weftOver=0, weftOverCables=0, floatsDropped=0;
   const weftOn = (P.weftEvery|0)>0, maxFloats=Math.max(1,P.weftMax|0);
@@ -686,6 +745,7 @@ function generate(P){
       moved++;
     }
     if(moved){
+      if(gridOn){ const ca=Math.round((xa-mg)/colPitch-0.5), cb=Math.round((xb-mg)/colPitch-0.5); for(let q=Math.min(ca,cb);q<Math.max(ca,cb)&&q<1024;q++) if(q>=0) colCov[q]+=moved; }
       const lo=Math.min(ia,ib), hi=Math.max(ia,ib);
       let over=0, overC=0; for(let q=lo+1;q<hi;q++){ over++; overC+=allNodes[q].cables.length; }
       hops.push({r, y:r*dy, xa, xb, a:A.id, b:B.id, n:moved, over});
@@ -694,6 +754,7 @@ function generate(P){
     return moved;
   }
   const ribCov=new Int32Array(allNodes.length);            // cables present along the current weft row, per cell
+  const colCov=new Int32Array(1024);                       // …and per grid column, for the support check
   const ribRow=new Float64Array(R+1).fill(-1);            // thinnest point of the rib at each row (-1 = no weft row)
   let ribsFull=0, ribMinSum=0, ribMeanSum=0;
   function weftRow(r){
@@ -702,7 +763,7 @@ function generate(P){
     const groups = P.weftSpan==="band" ? L.seq.filter(b=>!b.isGround).map(b=>b.strands) : [allNodes];
     const f0=Math.max(1,P.weftFloat|0), st=Math.max(1,P.weftStep|0), hopsN=Math.max(1,P.weftHops|0);
     const fl=()=> P.weftJitter>0 ? Math.max(1,Math.round(f0*(1+(rng()*2-1)*P.weftJitter))) : f0;
-    ribCov.fill(0);
+    ribCov.fill(0); colCov.fill(0);
     for(const arr of groups){
       const n=arr.length; if(n<2) continue;
       /* runs start every `st` strands and each covers `f` cells; the last run is
@@ -717,6 +778,16 @@ function generate(P){
       if(dirRight){ for(let i0=-lead-off;i0<n-1;i0+=st){ const f=fl(), i=Math.max(0,i0); let j=land(Math.min(n-1,i0+f),1); if(j>i){ const m=doFloat(arr[i],arr[j],r,hopsN); if(m) for(let q=ndIndex.get(arr[i].id);q<ndIndex.get(arr[j].id);q++) ribCov[q]+=m; } else if(j<0) floatsDropped++; } }
       else        { for(let i0=n-1+lead+off;i0>0;i0-=st){ const f=fl(), i=Math.min(n-1,i0); let j=land(Math.max(0,i0-f),-1); if(j>=0&&j<i){ const m=doFloat(arr[i],arr[j],r,hopsN); if(m) for(let q=ndIndex.get(arr[j].id);q<ndIndex.get(arr[i].id);q++) ribCov[q]+=m; } else if(j<0) floatsDropped++; } }
     }
+    /* with edge rails the rib's first and last cables are tied to the wall: extend the coverage to the rails */
+    if(gridOn && P.edgeRails && P.weftSpan!=="band"){
+      let first=-1,last=-1; for(let q=0;q<L.cols;q++) if(colCov[q]){ if(first<0)first=q; last=q; }
+      if(first>=0){ for(let q=0;q<first;q++) colCov[q]=1; for(let q=last+1;q<L.cols;q++) colCov[q]=1; railTies+=2; }
+    }
+    /* verify: a corner "held by a rib" must actually have rib under it between its anchors */
+    if(gridOn) for(const cn of corners){ if(cn.r!==r || cn.by!=="rib") continue;
+      const lo=Math.max(0,cn.l), hi=Math.min(L.cols-1,cn.rr-1); let ok=true;
+      for(let q=lo;q<=hi;q++) if(!colCov[q]){ ok=false; break; }
+      if(!ok){ cn.by="none"; unsupported++; ribCorners--; ribBroken++; } }
     /* continuity: is every cell between the first and last strand covered? */
     let mn=Infinity, sum=0; for(let q=0;q<allNodes.length-1;q++){ if(ribCov[q]<mn) mn=ribCov[q]; sum+=ribCov[q]; }
     ribRow[r]=isFinite(mn)?mn:0;
@@ -747,23 +818,30 @@ function generate(P){
        A column is ANCHORED at this row if a strand with cables arrives there
        vertically (it does not move this row). A corner is supported if it is on
        an anchored column, or on a rib whose nearest anchors on both sides are
-       within maxSpan cells. Moves whose end corner cannot be supported are
+       close enough that the rib's sag stays within the allowed sag. Moves whose end corner cannot be supported are
        shortened back toward the strand's own column.                         */
     const ribHere = gridOn && weftOn && r>0 && ((r+(P.weftPhase|0)) % P.weftEvery)===0;
     if(gridOn){
-      const lim=Math.max(1,P.maxStep|0), span=Math.max(1,P.maxSpan|0);
+      const lim=Math.max(1,P.maxStep|0);
       for(const nd of allNodes) if(nd.pcol!==undefined) nd.tcol = nd.pcol + clamp(nd.tcol-nd.pcol, -lim, lim);
       const anch=new Uint8Array(L.cols);
       const rebuild=()=>{ anch.fill(0); for(const nd of allNodes) if(nd.cables.length && (nd.pcol===undefined || nd.tcol===nd.pcol)) anch[nd.tcol]=1; };
       /* what a corner pulls with: everything the strand still carries below this row */
       const pullN=(nd)=> nd.cables.length*(Math.max(0,(maxD-r*dy))*1.08*(P.gpm/1000) + P.bulbMass/1000)*G;
-      const support=(c,nd)=>{
+      const Tn=Math.max(1,P.ribTension), sagMax=Math.max(0.001,(P.maxSag||40)/1000);
+      const support=(c,nd,rec)=>{
         if(anch[c]) return "vertical";
         if(!ribHere) return null;
-        const reach = (nd && pullN(nd) < P.heavyN) ? span*2 : span;
-        let l=c-1; while(l>=0 && !anch[l] && c-l<reach) l--;
-        let rr=c+1; while(rr<L.cols && !anch[rr] && rr-c<reach) rr++;
-        return (l>=0 && anch[l] && rr<L.cols && anch[rr]) ? "rib" : null;
+        const bandLocal = P.weftSpan==="band";
+        const lo = bandLocal ? nd.band.c0 : 0, hi = bandLocal ? nd.band.c0+nd.band.cols-1 : L.cols-1;
+        let l=c-1; while(l>=lo && !anch[l]) l--;            // nearest anchor left  (lo-1 = the rail / band edge)
+        let rr=c+1; while(rr<=hi && !anch[rr]) rr++;        // nearest anchor right
+        if(bandLocal && (l<lo || rr>hi)) return null;        // a rib inside a band is not tied to the wall
+        if((l<0 || rr>=L.cols) && !P.edgeRails) return null;
+        const a=(c-l)*colPitch, b=(rr-c)*colPitch, Lr=a+b, Wn=pullN(nd);
+        const sag=Wn*a*b/(Tn*Lr);
+        if(rec){ rec.l=l; rec.rr=rr; rec.sag=sag; }
+        return sag<=sagMax ? "rib" : null;
       };
       for(let pass=0;pass<4;pass++){
         rebuild(); let changed=false;
@@ -779,9 +857,9 @@ function generate(P){
       for(const nd of allNodes){
         nd.anch = !!(nd.cables.length && (nd.pcol===undefined || nd.tcol===nd.pcol));
         if(nd.cables.length && nd.pcol!==undefined && nd.tcol!==nd.pcol){
-          const by=support(nd.tcol,nd)||"none";
-          corners.push({r, col:nd.tcol, by, n:nd.cables.length, heavy: pullN(nd)>=P.heavyN});
-          if(by==="none") unsupported++; else if(by==="rib") ribCorners++;
+          const rec={}; const by=support(nd.tcol,nd,rec)||"none";
+          corners.push({r, col:nd.tcol, by, n:nd.cables.length, pull:pullN(nd), l:rec.l, rr:rec.rr, sag:rec.sag||0});
+          if(by==="none") unsupported++; else if(by==="rib"){ ribCorners++; if(rec.sag>maxSag) maxSag=rec.sag; }
         }
       }
       /* widest gap between anchors on this row — the longest a rib must span unsupported */
@@ -997,7 +1075,7 @@ function generate(P){
           ribsFull, ribRow, ribMinMean: weftRows? ribMinSum/weftRows : 0, ribThick: weftRows? ribMeanSum/weftRows : 0,
           floatsMax: cab.reduce((m,c)=>Math.max(m,c.floats),0), neverFloat: cab.filter(c=>!c.floats).length,
           gridOn, gridCols, compOverflow, runCells, runs, runLen,
-          corners, supportLimited, unsupported, ribCorners, maxAnchorGap, floatsDropped,
+          corners, supportLimited, unsupported, ribCorners, maxAnchorGap, floatsDropped, maxSag, ribBroken, railTies,
           jam,jamY,jamX,jamBins,binW:W/NBIN, sliceCV,sliceLo,sliceHi,peakCov,peakRow,
           totLen, minL, maxL, meanL:totLen/N,
           topLoad, rowLat, maxLat, maxLatAt, nn, nnMean, nnMin, cv, rTarget,
@@ -1234,7 +1312,8 @@ function drawStatsBody(){
     row("anisotropy pick : pair", fmt(aniso,1)+" : 1", aniso>1.6&&aniso<3.5?"good":"")+
     row("cables per strand at beam", D.perStrand+(D.N%D.S?"–"+(D.perStrand+1):""))+
     (D.gridOn ? row("moves", "orthogonal · ≤ "+D.P.maxStep+" cells per row") : row("one-pair move leans", fmt(Math.atan2(D.colPitch,D.dy)*180/Math.PI,0)+"°"))+
-    (()=>{ const c=D.layout.seq.find(b=>b.isCentre); const seqRows=c.rows.length*c.rs, vis=Math.min(seqRows,D.R+1);
+    (()=>{ const c=D.layout.seq.find(b=>b.isCentre); if(!c) return row("layout","tile · "+D.P.tile.motif+" ×"+D.layout.seq.filter(b=>!b.isGround).length+" · stagger "+D.P.tile.stagger);
+           const seqRows=c.rows.length*c.rs;
            return row("centre sequence", seqRows+" picks · "+(seqRows>D.R+1? (D.R+1)+" shown":"fits"), seqRows>D.R+1?"bad":"good"); })()+
     `<p class="note" style="margin-top:4px">${bandsTxt}${D.P.mirror?" · mirrored":""}</p>`;
   const perCable = D.cableCross/D.N;
@@ -1249,7 +1328,9 @@ function drawStatsBody(){
       : row("steepest run from vertical", fmt(angDeg,0)+"°", angDeg>50?"bad":angDeg>38?"":"good"))+
     (D.gridOn ? `<div class="stat hi"><span>— structure —</span><b></b></div>`+
       row("corners without support", D.unsupported, D.unsupported? "bad":"good")+
-      row("corners held by a rib", D.ribCorners+" of "+D.corners.length+" · heavy on rib: "+D.corners.filter(c=>c.by==="rib"&&c.heavy).length)+
+      row("corners held by a rib", D.ribCorners+" of "+D.corners.length+(D.ribBroken?" · "+D.ribBroken+" lost: no rib under them":""), D.ribBroken?"bad":"")+
+      row("worst rib sag under a corner", fmt(D.maxSag*1000,0)+" mm at "+D.P.ribTension+" N", D.maxSag*1000>D.P.maxSag?"bad":"good")+
+      row("rail ties (both edges)", D.railTies+(D.P.edgeRails?"":" — rails off"))+
       row("moves shortened for support", D.supportLimited)+
       row("runs dropped (no anchor to land on)", D.floatsDropped)+
       row("widest span between anchors", fmt(D.maxAnchorGap*D.colPitch,2)+" m", D.maxAnchorGap*D.colPitch>1.5?"bad":D.maxAnchorGap*D.colPitch>0.8?"":"good")+
@@ -1321,7 +1402,7 @@ function drawStatsBody(){
 const SLIDERS = [
   ["width",v=>fmt(v,1)+" m"],["height",v=>fmt(v,1)+" m"],["count",v=>v|0],
   ["dia",v=>fmt(v,1)],["gpm",v=>v|0],["bulbMass",v=>(v|0)+" g"],
-  ["gridPitch",v=>fmt(v*1000,0)+" mm"],["maxStep",v=>(v|0)+" cells"],["laneOff",v=>fmt(v*1000,0)+" mm"],["maxSpan",v=>(v|0)+" cells"],["heavyN",v=>(v|0)+" N"],
+  ["gridPitch",v=>fmt(v*1000,0)+" mm"],["maxStep",v=>(v|0)+" cells"],["laneOff",v=>fmt(v*1000,0)+" mm"],["ribTension",v=>(v|0)+" N"],["maxSag",v=>(v|0)+" mm"],
   ["rows",v=>v|0],["maxDepth",v=>fmt(v,1)+" m"],["margin",v=>fmt(v*1000,0)+" mm"],
   ["rowScale",v=>(v|0)],["maxAng",v=>(v|0)+"°"],["snap",v=>v?(v|0)+" mm":"off"],["pack",v=>fmt(v,2)],
   ["twine",v=>fmt(v,2)],["twinePer",v=>v|0],
@@ -1338,6 +1419,12 @@ function syncInputs(){
   document.getElementById("seed").value=P.seed;
   document.getElementById("mirror").checked=!!P.mirror;
   document.getElementById("grid").checked=!!P.grid;
+  document.getElementById("edgeRails").checked=!!P.edgeRails;
+  document.getElementById("layout").value=P.layout||"sadu";
+  document.getElementById("tileMotif").value=P.tile.motif; document.getElementById("tileDup").value=P.tile.dup;
+  document.getElementById("tileGap").value=P.tile.gap; document.getElementById("tileStagger").value=P.tile.stagger;
+  document.getElementById("saduBox").style.display = P.layout==="tile" ? "none" : "";
+  document.getElementById("tileBox").style.display = P.layout==="tile" ? "" : "none";
   document.getElementById("rows").disabled=!!P.grid;
   ["maxAng","snap"].forEach(id=>document.getElementById(id).disabled=!!P.grid);
   { const cols=Math.max(2,Math.round((P.width-2*P.margin)/P.gridPitch)), rows=Math.max(4,Math.round(Math.min(P.maxDepth,P.height)/P.gridPitch));
@@ -1441,8 +1528,14 @@ for(const [k,f] of SLIDERS){
   });
 }
 document.getElementById("mirror").addEventListener("change",e=>{ P.mirror=e.target.checked; regen(); });
+document.getElementById("layout").addEventListener("change",e=>{ P.layout=e.target.value; syncInputs(); regen(); });
+document.getElementById("tileMotif").innerHTML=LEX_KEYS.map(k=>`<option value="${k}">${LEX[k].label}</option>`).join("");
+document.getElementById("tileMotif").addEventListener("change",e=>{ P.tile.motif=e.target.value; regen(); });
+for(const [id,k] of [["tileDup","dup"],["tileGap","gap"],["tileStagger","stagger"]])
+  document.getElementById(id).addEventListener("input",e=>{ P.tile[k]=Math.max(0,parseInt(e.target.value)||0); if(k==="dup") P.tile.dup=Math.max(1,P.tile.dup); regen(); });
 document.getElementById("grid").addEventListener("change",e=>{ P.grid=e.target.checked; syncInputs(); regen(); });
-for(const id of ["gridPitch","maxStep","laneOff","maxSpan","heavyN"]) document.getElementById(id).addEventListener("input",()=>syncInputs());
+for(const id of ["gridPitch","maxStep","laneOff"]) document.getElementById(id).addEventListener("input",()=>syncInputs());
+document.getElementById("edgeRails").addEventListener("change",e=>{ P.edgeRails=e.target.checked; regen(); });
 document.getElementById("weftSpan").addEventListener("change",e=>{ P.weftSpan=e.target.value; regen(); });
 for(const id of ["weftFloat","weftStep","weftHops","weftEvery"]) document.getElementById(id).addEventListener("input",()=>syncInputs());
 document.getElementById("cGap").addEventListener("input",e=>{ P.centre.gap=parseInt(e.target.value)||0; regen(); });
@@ -1461,12 +1554,43 @@ function randomComposition(R){
   return {borders,centre};
 }
 document.getElementById("btnRand").onclick=()=>{P.seed=(Math.random()*1e9)|0;currentFavId=null;syncInputs();regen(true);logSeen();renderFavs();};
+function randomiseWithin(pr){
+  /* keep the idea of the preset — layout, motif(s), glyphs, mirroring, grid — and
+     vary the rest inside ranges that keep the structure standing              */
+  const R=Math.random, ri=(a,b)=>a+Math.floor(R()*(b-a+1)), rf=(a,b)=>a+R()*(b-a), pick=a=>a[Math.floor(R()*a.length)];
+  applyParams(pr);
+  P.seed=(R()*1e9)|0;
+  P.gridPitch=+(Math.round(pr.gridPitch*rf(0.9,1.15)/0.005)*0.005).toFixed(3);
+  P.maxStep=clamp((pr.maxStep|0)+ri(-1,1),1,4); P.laneOff=+rf(0.01,0.03).toFixed(4);
+  P.rowScale=clamp((pr.rowScale|0)+(R()<0.3?ri(-1,1):0),1,3);
+  P.twine=R()<0.15?0:+rf(0.6,1.2).toFixed(2); P.twinePer=clamp((pr.twinePer|0)+ri(-2,2),1,8);
+  P.shedGamma=+rf(0.6,1.1).toFixed(2); P.tailFactor=+rf(0.5,2.5).toFixed(1); P.topClear=+pick([0.2,0.4,0.4,0.6]).toFixed(2); P.minGap=ri(30,100);
+  /* rib ranges that keep the ribs continuous: one cable per run, runs of 6–8 cells,
+     a new run every ⅓–½ run — measured: 2 cables per run or short tight runs deplete
+     the strands and leave corners without a rib under them                     */
+  P.weftEvery=R()<0.9?1:2; P.weftPhase=0; P.weftFloat=ri(6,8); P.weftStep=clamp(Math.round(P.weftFloat*rf(0.33,0.5)),2,P.weftFloat);
+  P.weftHops=1; P.weftMax=ri(4,6); P.weftJitter=R()<0.8?0:+rf(0.1,0.2).toFixed(2); P.weftSag=+rf(0,0.03).toFixed(3); P.weftSpan="wall";
+  P.ribTension=ri(200,350); P.maxSag=ri(30,60); P.edgeRails=true;
+  if(pr.layout==="tile"){
+    P.tile.stagger=clamp((pr.tile.stagger|0)+ri(-2,2),0,10);
+    P.tile.gap=Math.max(pr.tile.gap?1:0, pick([1,1,1,2]));
+    P.tile.dup=R()<0.8? pr.tile.dup : clamp((pr.tile.dup|0)+ri(-1,1),1,3);
+  } else {
+    for(const b of P.borders){ if(R()<0.3) b.dup=clamp(b.dup+ri(-1,1),1,3); b.gap=Math.max(1,b.gap+ri(-1,1)); b.phase=ri(0,6); }
+    P.centre.gap=ri(1,5); P.centre.dup=clamp(P.centre.dup+(R()<0.3?ri(-1,1):0),1,3);
+    P.centre.rowScale=clamp(P.centre.rowScale+(R()<0.3?ri(-1,1):0),1,3); P.centre.fit=true;
+  }
+  currentFavId=null;
+  syncInputs(); buildBorders(); regen(true); logSeen(); renderFavs();
+}
 document.getElementById("btnRandAll").onclick=()=>{
+  if(family && PRESETS[family]){ randomiseWithin(PRESETS[family]); return; }
   /* every DESIGN variable, full range. Wall size, cable count, Ø, g/m and bulb mass are facts and stay. */
   const R=Math.random, ri=(a,b)=>a+Math.floor(R()*(b-a+1)), rf=(a,b)=>a+R()*(b-a), pick=a=>a[Math.floor(R()*a.length)];
   P.seed=(R()*1e9)|0;
   P.grid=R()<0.85; P.gridPitch=+pick([0.08,0.09,0.1,0.1,0.1,0.11,0.125,0.14,0.175]).toFixed(3);
-  P.maxStep=ri(1,4); P.laneOff=+rf(0,0.035).toFixed(4); P.maxSpan=ri(3,8); P.heavyN=ri(8,30);
+  P.maxStep=ri(1,4); P.laneOff=+rf(0,0.035).toFixed(4); P.ribTension=ri(60,300); P.maxSag=ri(20,80); P.edgeRails=R()<0.85;
+  P.layout=R()<0.6?"tile":"sadu"; P.tile={motif:pick(LEX_KEYS.filter(k=>k!=="ground"&&k!=="stripe")), dup:R()<0.7?1:2, gap:R()<0.25?0:ri(1,3), stagger:ri(0,8)};
   P.rows=ri(20,50); P.rowScale=pick([1,1,2,2,3]); P.maxAng=ri(30,60); P.snap=0; P.pack=1;
   P.margin=+pick([0,0,0,0.05,0.1]).toFixed(2);
   P.twine=R()<0.2?0:+rf(0.5,1.2).toFixed(2); P.twinePer=ri(1,8);
@@ -1480,8 +1604,16 @@ document.getElementById("btnRandAll").onclick=()=>{
   syncInputs(); buildBorders(); regen(true); logSeen(); renderFavs();
 };
 const presetSel=document.getElementById("preset");
-presetSel.innerHTML=Object.keys(PRESETS).map(k=>`<option>${k}</option>`).join("");
-presetSel.onchange=()=>{ applyParams(PRESETS[presetSel.value]); currentFavId=null; syncInputs(); buildBorders(); regen(); };
+presetSel.innerHTML='<option value="">— any style (randomise the full range) —</option>'+Object.keys(PRESETS).map(k=>`<option>${k}</option>`).join("");
+let family=null;                                  // the preset whose idea Randomise must keep
+function setFamily(name){
+  family = name && PRESETS[name] ? name : null;
+  document.getElementById("btnRandAll").textContent = family ? "⚄ Randomise within "+family : "⚄ Randomise all";
+  document.getElementById("randNote").textContent = family
+    ? `keeps the ${PRESETS[family].layout==="tile" ? PRESETS[family].tile.motif+" tile" : "border motifs and centre glyphs"} of “${family}”, varies everything else within ranges that keep the structure`
+    : "every design variable over its full range; wall and cable facts stay";
+}
+presetSel.onchange=()=>{ if(presetSel.value){ applyParams(PRESETS[presetSel.value]); currentFavId=null; syncInputs(); buildBorders(); regen(); } setFamily(presetSel.value); };
 function applyParams(pr){
   const src=JSON.parse(JSON.stringify(pr));
   Object.assign(P, src);
@@ -1491,7 +1623,9 @@ function applyParams(pr){
             fit: src.centre ? src.centre.fit!==false : true};
   if(src.weftStep==null){ P.weftStep = src.weftMode==="all" ? 1 : Math.max(1,P.weftFloat|0); }
   if(src.weftMax==null) P.weftMax=4;
-  if(src.maxSpan==null) P.maxSpan=5; if(src.heavyN==null) P.heavyN=15;
+  if(src.ribTension==null) P.ribTension=250; if(src.maxSag==null) P.maxSag=40; if(src.edgeRails==null) P.edgeRails=true;
+  if(!src.layout) P.layout="sadu";
+  P.tile = Object.assign({motif:"ein",dup:1,gap:1,stagger:3}, src.tile||{});
   P.maxDepth=Math.min(P.maxDepth,P.height);
 }
 document.querySelectorAll("#viewSeg button").forEach(b=>b.onclick=()=>{
@@ -1540,6 +1674,7 @@ function summaryOf(D){
     strandCrossings:D.crossings.length, crossingsPerCable:+(D.cableCross/D.N).toFixed(2),
     weftRows:D.weftRows, weftFloats:D.hops.length, weftCables:D.weftCables, weftOverCables:D.weftOverCables,
     unsupportedCorners:D.unsupported, ribCorners:D.ribCorners, supportLimited:D.supportLimited, maxAnchorGap_m:+(D.maxAnchorGap*D.colPitch).toFixed(2),
+    maxRibSag_mm:Math.round(D.maxSag*1000), layout:D.P.layout, tile:D.P.tile,
     turnsPerCable:+D.turnsMean.toFixed(2), turnsMax:D.turnsMax, steepestDeg:+(D.maxAngle*180/Math.PI).toFixed(1),
     topCoverage:+D.covB[0].toFixed(3), peakCoverage:+D.peakCov.toFixed(3), peakAt_m:+(D.peakRow*D.dy).toFixed(2),
     pinchDepth:+D.jam.toFixed(2),
@@ -1561,8 +1696,8 @@ function thumbOf(D,px){
   x.stroke();
   try{ return c.toDataURL("image/png"); }catch(e){ return ""; }
 }
-function compName(p){ return (p.borders||[]).map(b=>b.motif).join("+")+" | "+(p.centre?p.centre.glyphs.join("+"):""); }
-function favLabelDefault(){ return `#${FAVS.length+1} ${compName(P)} · seed ${P.seed}`; }
+function compName(p){ return p.layout==="tile" ? `tile ${p.tile.motif}×${p.tile.dup} st${p.tile.stagger}` : (p.borders||[]).map(b=>b.motif).join("+")+" | "+(p.centre?p.centre.glyphs.join("+"):""); }
+function favLabelDefault(){ return `#${FAVS.length+1} ${(typeof family!=="undefined"&&family)? family+" · " : ""}${compName(P)} · seed ${P.seed}`; }
 function renderFavs(){
   if(typeof fillEvFrom==="function") fillEvFrom();
   const host=document.getElementById("favList");
@@ -1596,7 +1731,7 @@ function loadFav(f){
 function saveFav(name,note){
   if(!D) return;
   const f={ id:Date.now().toString(36)+Math.random().toString(36).slice(2,6), name, note:note||"",
-            savedAt:new Date().toISOString(), params:JSON.parse(JSON.stringify(D.P)),
+            savedAt:new Date().toISOString(), family:(typeof family!=="undefined"&&family)||null, params:JSON.parse(JSON.stringify(D.P)),
             summary:summaryOf(D), thumb:thumbOf(D) };
   FAVS.push(f); currentFavId=f.id;
   if(!lsSet(FAV_KEY,FAVS)){
@@ -1607,7 +1742,7 @@ function saveFav(name,note){
 }
 function logSeen(){
   if(!D) return;
-  SEEN.push({ at:new Date().toISOString(), params:JSON.parse(JSON.stringify(D.P)), summary:summaryOf(D) });
+  SEEN.push({ at:new Date().toISOString(), family:(typeof family!=="undefined"&&family)||null, params:JSON.parse(JSON.stringify(D.P)), summary:summaryOf(D) });
   if(SEEN.length>600) SEEN=SEEN.slice(-600);
   lsSet(SEEN_KEY,SEEN);
   document.getElementById("seenCount").textContent=SEEN.length;
@@ -1673,14 +1808,16 @@ const EV = { S:0.7, G:5, gen:0, parentName:"current design", hist:[], noise:1, t
 const GENES=[["rows",16,50,1],["shedGamma",0.4,2.0,0],["tailFactor",0,4,0],["maxAng",25,65,1],["topClear",0,1.5,0],
   ["rowScale",1,3,1],["twine",0,1.1,0],["twinePer",1,10,1],
   ["weftEvery",0,8,1],["weftPhase",0,7,1],["weftFloat",1,12,1],["weftStep",1,8,1],["weftJitter",0,1,0],["weftHops",1,3,1],["weftSag",0,0.12,0],
-  ["maxStep",1,5,1],["laneOff",0,0.04,0],["gridPitch",0.08,0.2,0],["weftMax",2,8,1],["maxSpan",2,8,1],["heavyN",5,40,1]];
+  ["maxStep",1,5,1],["laneOff",0,0.04,0],["gridPitch",0.08,0.2,0],["weftMax",2,8,1],["ribTension",40,400,1],["maxSag",10,120,1]];
+const TGENES=[["dup",1,3,1],["gap",0,4,1],["stagger",0,10,1]];
 const CGENES=[["gap",0,8,1],["dup",1,3,1],["rowScale",1,3,1]];
 const BGENES=[["dup",1,3,1],["gap",0,5,1],["phase",0,8,1]];
-const MAXB=6, NDIM=GENES.length+CGENES.length+MAXB*BGENES.length;
+const MAXB=6, NDIM=GENES.length+CGENES.length+TGENES.length+MAXB*BGENES.length;
 function vecOf(p){
   const v=[];
   for(const [k,lo,hi] of GENES) v.push(clamp(((p[k]??lo)-lo)/(hi-lo),0,1));
   for(const [k,lo,hi] of CGENES) v.push(clamp((((p.centre||{})[k]??lo)-lo)/(hi-lo),0,1));
+  for(const [k,lo,hi] of TGENES) v.push(clamp((((p.tile||{})[k]??lo)-lo)/(hi-lo),0,1));
   const nb=Math.max(1,(p.borders||[]).length);
   for(let i=0;i<MAXB;i++){ const b=(p.borders||[])[Math.min(i,nb-1)]||{};
     for(const [k,lo,hi] of BGENES) v.push(clamp(((b[k]??lo)-lo)/(hi-lo),0,1)); }
@@ -1689,12 +1826,16 @@ function vecOf(p){
 function geneName(i){
   if(i<GENES.length) return GENES[i][0];
   i-=GENES.length; if(i<CGENES.length) return "centre."+CGENES[i][0];
-  i-=CGENES.length; return "border"+(Math.floor(i/BGENES.length)+1)+"."+BGENES[i%BGENES.length][0];
+  i-=CGENES.length; if(i<TGENES.length) return "tile."+TGENES[i][0];
+  i-=TGENES.length; return "border"+(Math.floor(i/BGENES.length)+1)+"."+BGENES[i%BGENES.length][0];
 }
 function applyVec(p,v){
   let i=0;
   for(const [k,lo,hi,int] of GENES){ let x=lo+clamp(v[i++],0,1)*(hi-lo); if(int) x=Math.round(x); p[k]=x; }
   for(const [k,lo,hi,int] of CGENES){ let x=lo+clamp(v[i++],0,1)*(hi-lo); if(int) x=Math.round(x); p.centre[k]=x; }
+  if(!p.tile) p.tile={motif:"ein",dup:1,gap:1,stagger:3};
+  for(const [k,lo,hi,int] of TGENES){ let x=lo+clamp(v[i++],0,1)*(hi-lo); if(int) x=Math.round(x); p.tile[k]=x; }
+  p.tile.dup=Math.max(1,p.tile.dup|0);
   for(let bi=0;bi<MAXB;bi++) for(const [k,lo,hi,int] of BGENES){
     let x=lo+clamp(v[i++],0,1)*(hi-lo); if(int) x=Math.round(x); if(bi<p.borders.length) p.borders[bi][k]=x; }
   p.maxDepth=Math.min(p.maxDepth,p.height);
@@ -1756,6 +1897,8 @@ function mutant(i,j){
   /* structure: motifs, glyphs, band count, mirroring — jumps, not drifts */
   const pMotif=S*0.35*ring, pGlyph=S*0.35*ring, pBands=S*0.22*ring;
   for(const b of parent.borders) if(rng()<pMotif) b.motif=LEX_KEYS[Math.floor(rng()*LEX_KEYS.length)];
+  if(rng()<pMotif) parent.tile.motif=LEX_KEYS[Math.floor(rng()*LEX_KEYS.length)];
+  if(rng()<S*0.08*ring) parent.layout = parent.layout==="tile" ? "sadu" : "tile";
   const gl=parent.centre.glyphs;
   for(let k=0;k<gl.length;k++) if(rng()<pGlyph) gl[k]=GLYPH_KEYS[Math.floor(rng()*GLYPH_KEYS.length)];
   if(rng()<pGlyph*0.6){ if(gl.length>1 && rng()<0.5) gl.splice(Math.floor(rng()*gl.length),1); else if(gl.length<6) gl.splice(Math.floor(rng()*(gl.length+1)),0,GLYPH_KEYS[Math.floor(rng()*GLYPH_KEYS.length)]); }
@@ -2008,6 +2151,7 @@ document.getElementById("exPng").onclick=()=>{
 };
 
 /* ═══════════════════════ BOOT ═══════════════════════ */
+applyParams(PRESETS["Eye lattice"]); presetSel.value="Eye lattice"; setFamily("Eye lattice");
 syncInputs(); buildBorders(); regen(true); renderFavs();
 setTimeout(()=>{draw();drawCharts();},60);
 </script>
