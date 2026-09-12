@@ -164,11 +164,13 @@
     <label class="row"><span>grid pitch</span><input type="range" id="gridPitch" min="0.05" max="0.3" step="0.005"><b class="val"></b></label>
     <label class="row"><span>max run per row</span><input type="range" id="maxStep" min="1" max="6" step="1"><b class="val"></b></label>
     <label class="row"><span>lane offset</span><input type="range" id="laneOff" min="0" max="0.05" step="0.0025"><b class="val"></b></label>
-    <label class="row"><span>corner on rib within</span><input type="range" id="maxSpan" min="1" max="6" step="1"><b class="val"></b></label>
+    <label class="row"><span>heavy corner on rib within</span><input type="range" id="maxSpan" min="1" max="10" step="1"><b class="val"></b></label>
+    <label class="row"><span>heavy means pull ≥</span><input type="range" id="heavyN" min="2" max="60" step="1"><b class="val"></b></label>
     <p class="note"><b>Support rule.</b> Every 90° corner must sit on an <i>anchored</i> column — a strand whose cables
-      arrive vertically at that row — or on a rib that is tied to anchored strands within this many cells on both
-      sides. Moves that cannot be supported are shortened; runs may only land on anchored strands. Corners that
-      still fail are counted and drawn as red ✕ in the Technical view.</p>
+      arrive vertically at that row — or on a rib tied to anchored strands on both sides. A <i>heavy</i> corner (a
+      bundle pulling ≥ the threshold) needs its anchors within this many cells; a light one (a few cables near
+      the floor) may sit twice as far from them. Moves that cannot be supported are shortened; a run may only
+      land on a strand that still has cables. Corners that still fail are counted and drawn as red ✕.</p>
     <p class="note" id="gridNote"></p>
     <label class="row"><span>tie rows (picks)</span><input type="range" id="rows" min="8" max="140" step="1"><b class="val"></b></label>
     <label class="row"><span>lowest tie</span><input type="range" id="maxDepth" min="1" max="14" step="0.1"><b class="val"></b></label>
@@ -427,7 +429,7 @@ const bd=(motif,dup,gap,phase)=>({motif,dup:dup||1,gap:gap==null?1:gap,phase:pha
 const PRESETS = {
   "Sadu strip (default)":{
     rows:32, rowScale:1, twine:0.6, twinePer:4, mirror:true, maxAng:45,
-    grid:true, gridPitch:0.10, maxStep:2, laneOff:0.02, maxSpan:3, margin:0,
+    grid:true, gridPitch:0.10, maxStep:2, laneOff:0.02, maxSpan:5, heavyN:15, margin:0,
     weftEvery:1, weftPhase:0, weftFloat:6, weftStep:3, weftJitter:0, weftHops:1, weftSag:0, weftSpan:"wall",
     borders:[bd("stripe",2,1),bd("zigzag",1,1),bd("ein",1,1),bd("dhurs",1,1),bd("uwairjan",1,2)],
     centre:{glyphs:["bigDiamond","tree","nested"],gap:3,dup:2,rowScale:2,fit:true}},
@@ -711,7 +713,7 @@ function generate(P){
                                                              // takes a turn at weft duty
       /* on the grid a run may only land on an anchored strand: look around the
          planned end for one, else the run is dropped (a corner in mid-air is worse than a gap) */
-      const land=(j,dir)=>{ if(!gridOn) return j; for(const d of [0,dir,-dir,2*dir,-2*dir]){ const q=j+d; if(q>=0&&q<n&&arr[q].anch) return q; } return -1; };
+      const land=(j,dir)=>{ if(!gridOn) return j; for(const d of [0,dir,-dir,2*dir,-2*dir]){ const q=j+d; if(q>=0&&q<n&&arr[q].cables.length) return q; } return -1; };
       if(dirRight){ for(let i0=-lead-off;i0<n-1;i0+=st){ const f=fl(), i=Math.max(0,i0); let j=land(Math.min(n-1,i0+f),1); if(j>i){ const m=doFloat(arr[i],arr[j],r,hopsN); if(m) for(let q=ndIndex.get(arr[i].id);q<ndIndex.get(arr[j].id);q++) ribCov[q]+=m; } else if(j<0) floatsDropped++; } }
       else        { for(let i0=n-1+lead+off;i0>0;i0-=st){ const f=fl(), i=Math.min(n-1,i0); let j=land(Math.max(0,i0-f),-1); if(j>=0&&j<i){ const m=doFloat(arr[i],arr[j],r,hopsN); if(m) for(let q=ndIndex.get(arr[j].id);q<ndIndex.get(arr[i].id);q++) ribCov[q]+=m; } else if(j<0) floatsDropped++; } }
     }
@@ -753,11 +755,14 @@ function generate(P){
       for(const nd of allNodes) if(nd.pcol!==undefined) nd.tcol = nd.pcol + clamp(nd.tcol-nd.pcol, -lim, lim);
       const anch=new Uint8Array(L.cols);
       const rebuild=()=>{ anch.fill(0); for(const nd of allNodes) if(nd.cables.length && (nd.pcol===undefined || nd.tcol===nd.pcol)) anch[nd.tcol]=1; };
-      const support=(c)=>{
+      /* what a corner pulls with: everything the strand still carries below this row */
+      const pullN=(nd)=> nd.cables.length*(Math.max(0,(maxD-r*dy))*1.08*(P.gpm/1000) + P.bulbMass/1000)*G;
+      const support=(c,nd)=>{
         if(anch[c]) return "vertical";
         if(!ribHere) return null;
-        let l=c-1; while(l>=0 && !anch[l] && c-l<span) l--;
-        let rr=c+1; while(rr<L.cols && !anch[rr] && rr-c<span) rr++;
+        const reach = (nd && pullN(nd) < P.heavyN) ? span*2 : span;
+        let l=c-1; while(l>=0 && !anch[l] && c-l<reach) l--;
+        let rr=c+1; while(rr<L.cols && !anch[rr] && rr-c<reach) rr++;
         return (l>=0 && anch[l] && rr<L.cols && anch[rr]) ? "rib" : null;
       };
       for(let pass=0;pass<4;pass++){
@@ -765,7 +770,7 @@ function generate(P){
         for(const nd of allNodes){
           if(!nd.cables.length || nd.pcol===undefined || nd.tcol===nd.pcol) continue;
           let c=nd.tcol; const dir=Math.sign(c-nd.pcol);
-          while(c!==nd.pcol && !support(c)) c-=dir;
+          while(c!==nd.pcol && !support(c,nd)) c-=dir;
           if(c!==nd.tcol){ nd.tcol=c; changed=true; supportLimited++; }
         }
         if(!changed) break;
@@ -774,8 +779,8 @@ function generate(P){
       for(const nd of allNodes){
         nd.anch = !!(nd.cables.length && (nd.pcol===undefined || nd.tcol===nd.pcol));
         if(nd.cables.length && nd.pcol!==undefined && nd.tcol!==nd.pcol){
-          const by=support(nd.tcol)||"none";
-          corners.push({r, col:nd.tcol, by, n:nd.cables.length});
+          const by=support(nd.tcol,nd)||"none";
+          corners.push({r, col:nd.tcol, by, n:nd.cables.length, heavy: pullN(nd)>=P.heavyN});
           if(by==="none") unsupported++; else if(by==="rib") ribCorners++;
         }
       }
@@ -1244,7 +1249,7 @@ function drawStatsBody(){
       : row("steepest run from vertical", fmt(angDeg,0)+"°", angDeg>50?"bad":angDeg>38?"":"good"))+
     (D.gridOn ? `<div class="stat hi"><span>— structure —</span><b></b></div>`+
       row("corners without support", D.unsupported, D.unsupported? "bad":"good")+
-      row("corners held by a rib", D.ribCorners+" of "+D.corners.length)+
+      row("corners held by a rib", D.ribCorners+" of "+D.corners.length+" · heavy on rib: "+D.corners.filter(c=>c.by==="rib"&&c.heavy).length)+
       row("moves shortened for support", D.supportLimited)+
       row("runs dropped (no anchor to land on)", D.floatsDropped)+
       row("widest span between anchors", fmt(D.maxAnchorGap*D.colPitch,2)+" m", D.maxAnchorGap*D.colPitch>1.5?"bad":D.maxAnchorGap*D.colPitch>0.8?"":"good")+
@@ -1316,7 +1321,7 @@ function drawStatsBody(){
 const SLIDERS = [
   ["width",v=>fmt(v,1)+" m"],["height",v=>fmt(v,1)+" m"],["count",v=>v|0],
   ["dia",v=>fmt(v,1)],["gpm",v=>v|0],["bulbMass",v=>(v|0)+" g"],
-  ["gridPitch",v=>fmt(v*1000,0)+" mm"],["maxStep",v=>(v|0)+" cells"],["laneOff",v=>fmt(v*1000,0)+" mm"],["maxSpan",v=>(v|0)+" cells"],
+  ["gridPitch",v=>fmt(v*1000,0)+" mm"],["maxStep",v=>(v|0)+" cells"],["laneOff",v=>fmt(v*1000,0)+" mm"],["maxSpan",v=>(v|0)+" cells"],["heavyN",v=>(v|0)+" N"],
   ["rows",v=>v|0],["maxDepth",v=>fmt(v,1)+" m"],["margin",v=>fmt(v*1000,0)+" mm"],
   ["rowScale",v=>(v|0)],["maxAng",v=>(v|0)+"°"],["snap",v=>v?(v|0)+" mm":"off"],["pack",v=>fmt(v,2)],
   ["twine",v=>fmt(v,2)],["twinePer",v=>v|0],
@@ -1437,7 +1442,7 @@ for(const [k,f] of SLIDERS){
 }
 document.getElementById("mirror").addEventListener("change",e=>{ P.mirror=e.target.checked; regen(); });
 document.getElementById("grid").addEventListener("change",e=>{ P.grid=e.target.checked; syncInputs(); regen(); });
-for(const id of ["gridPitch","maxStep","laneOff","maxSpan"]) document.getElementById(id).addEventListener("input",()=>syncInputs());
+for(const id of ["gridPitch","maxStep","laneOff","maxSpan","heavyN"]) document.getElementById(id).addEventListener("input",()=>syncInputs());
 document.getElementById("weftSpan").addEventListener("change",e=>{ P.weftSpan=e.target.value; regen(); });
 for(const id of ["weftFloat","weftStep","weftHops","weftEvery"]) document.getElementById(id).addEventListener("input",()=>syncInputs());
 document.getElementById("cGap").addEventListener("input",e=>{ P.centre.gap=parseInt(e.target.value)||0; regen(); });
@@ -1461,7 +1466,7 @@ document.getElementById("btnRandAll").onclick=()=>{
   const R=Math.random, ri=(a,b)=>a+Math.floor(R()*(b-a+1)), rf=(a,b)=>a+R()*(b-a), pick=a=>a[Math.floor(R()*a.length)];
   P.seed=(R()*1e9)|0;
   P.grid=R()<0.85; P.gridPitch=+pick([0.08,0.09,0.1,0.1,0.1,0.11,0.125,0.14,0.175]).toFixed(3);
-  P.maxStep=ri(1,4); P.laneOff=+rf(0,0.035).toFixed(4); P.maxSpan=ri(1,5);
+  P.maxStep=ri(1,4); P.laneOff=+rf(0,0.035).toFixed(4); P.maxSpan=ri(3,8); P.heavyN=ri(8,30);
   P.rows=ri(20,50); P.rowScale=pick([1,1,2,2,3]); P.maxAng=ri(30,60); P.snap=0; P.pack=1;
   P.margin=+pick([0,0,0,0.05,0.1]).toFixed(2);
   P.twine=R()<0.2?0:+rf(0.5,1.2).toFixed(2); P.twinePer=ri(1,8);
@@ -1486,6 +1491,7 @@ function applyParams(pr){
             fit: src.centre ? src.centre.fit!==false : true};
   if(src.weftStep==null){ P.weftStep = src.weftMode==="all" ? 1 : Math.max(1,P.weftFloat|0); }
   if(src.weftMax==null) P.weftMax=4;
+  if(src.maxSpan==null) P.maxSpan=5; if(src.heavyN==null) P.heavyN=15;
   P.maxDepth=Math.min(P.maxDepth,P.height);
 }
 document.querySelectorAll("#viewSeg button").forEach(b=>b.onclick=()=>{
@@ -1667,7 +1673,7 @@ const EV = { S:0.7, G:5, gen:0, parentName:"current design", hist:[], noise:1, t
 const GENES=[["rows",16,50,1],["shedGamma",0.4,2.0,0],["tailFactor",0,4,0],["maxAng",25,65,1],["topClear",0,1.5,0],
   ["rowScale",1,3,1],["twine",0,1.1,0],["twinePer",1,10,1],
   ["weftEvery",0,8,1],["weftPhase",0,7,1],["weftFloat",1,12,1],["weftStep",1,8,1],["weftJitter",0,1,0],["weftHops",1,3,1],["weftSag",0,0.12,0],
-  ["maxStep",1,5,1],["laneOff",0,0.04,0],["gridPitch",0.08,0.2,0],["weftMax",2,8,1],["maxSpan",1,5,1]];
+  ["maxStep",1,5,1],["laneOff",0,0.04,0],["gridPitch",0.08,0.2,0],["weftMax",2,8,1],["maxSpan",2,8,1],["heavyN",5,40,1]];
 const CGENES=[["gap",0,8,1],["dup",1,3,1],["rowScale",1,3,1]];
 const BGENES=[["dup",1,3,1],["gap",0,5,1],["phase",0,8,1]];
 const MAXB=6, NDIM=GENES.length+CGENES.length+MAXB*BGENES.length;

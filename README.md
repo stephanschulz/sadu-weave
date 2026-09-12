@@ -1,6 +1,8 @@
 # Al Sadu Cable Weave — loom model
 
-Open **`sadu-weave.html`** in a browser (double-click it). No server, no build, no
+Live: **https://stephanschulz.github.io/sadu-weave/**
+
+Or open **`sadu-weave.html`** in a browser (double-click it). No server, no build, no
 dependencies. Use `file://` — the exports are real file downloads.
 
 The earlier "field model" version (figures as displacement fields, forking cords)
