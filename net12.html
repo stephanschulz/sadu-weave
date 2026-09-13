@@ -23,7 +23,7 @@
   .seg button.on{ background:#4a443c; }
   .note{ font-size:11px; color:var(--dim); margin:4px 0; }
   main{ position:relative; overflow:hidden; background:#2a2723; }
-  canvas#cv{ position:absolute; inset:0; width:100%; height:100%; cursor:grab; }
+  canvas#cv, canvas#gl3d{ position:absolute; inset:0; width:100%; height:100%; cursor:grab; }
   #hud{ position:absolute; left:10px; bottom:8px; font:11px var(--mono); color:#e9e2d6; background:rgba(0,0,0,.55); padding:4px 7px; border-radius:4px; pointer-events:none; white-space:pre; }
   #prog{ position:absolute; left:50%; top:12px; transform:translateX(-50%); font:12px var(--mono); background:rgba(0,0,0,.7); padding:5px 10px; border-radius:5px; pointer-events:none; }
   .stat{ display:flex; justify-content:space-between; gap:8px; font-size:11.5px; padding:2px 0; border-bottom:1px solid #26231f; }
@@ -61,10 +61,12 @@
   <div class="btnrow"><button id="gen" class="primary">generate</button><button id="newBulbs">new bulb layout</button><button id="newSeed">new routing</button></div>
 
   <h2>View</h2>
-  <div class="seg" id="viewSeg"><button data-v="cables" class="on">cables</button><button data-v="heat">load heat</button><button data-v="density">density map</button><button data-v="lattice">lattice</button></div>
+  <div class="seg" id="viewSeg"><button data-v="cables" class="on">cables</button><button data-v="heat">load heat</button><button data-v="density">density map</button><button data-v="3d">3D</button><button data-v="lattice">lattice</button></div>
   <label><span>lattice lines (blue)</span><input type="checkbox" id="showLattice" checked></label>
   <label><span>bulbs and tails</span><input type="checkbox" id="showBulbs" checked></label>
   <label><span>uncovered segments (red)</span><input type="checkbox" id="showUncov" checked></label>
+  <label><span>3D depth exaggeration <b id="zExagVal" style="font:11px ui-monospace,monospace">1×</b></span><input type="range" id="zExag" value="1" min="1" max="10" step="0.5"></label>
+  <label><span>3D colour each cable</span><input type="checkbox" id="colorEach"></label>
   <label><span>density smoothing <b id="densSmoothVal" style="font:11px ui-monospace,monospace">20 cm</b></span><input type="range" id="densSmooth" value="20" min="5" max="60" step="1"></label>
   <label><span>cable opacity <b id="cableAlphaVal" style="font:11px ui-monospace,monospace">100 %</b></span><input type="range" id="cableAlpha" min="5" max="100" step="1" value="100"></label>
   <p class="note">Wheel zooms, drag pans, double-click resets. Hover near a bulb to follow its cable (white dots = zip ties at its turns).</p>
@@ -74,7 +76,7 @@
   <p class="note">Downloads need the page opened from file://.</p>
 </aside>
 
-<main><canvas id="cv"></canvas><div id="hud"></div><div id="prog" hidden></div></main>
+<main><canvas id="cv"></canvas><canvas id="gl3d" hidden></canvas><div id="hud"></div><div id="prog" hidden></div></main>
 
 <aside class="right">
   <h2>Lattice</h2><div id="stLat"></div>
@@ -376,6 +378,47 @@ function* routeAll(p, net, bulbs, seed){
   return {cab, load, target, meanStub, repairs};
 }
 
+/* ───────── 3D bundles ─────────
+   Cables sharing a segment pack in a hexagonal (honeycomb) bundle around the string;
+   slot order = beam order, so neighbours stay neighbours. At a crossing the bundles of
+   the different directions stack front to back (fixed order), so the stack depth there
+   is the sum of their diameters. Ties squeeze the bundle at every crossing (pinch).  */
+const CABLE_D=0.0055;
+const HEX=(()=>{ const a=[]; for(let j=-12;j<=12;j++) for(let i=-12;i<=12;i++){ const x=i+j*0.5, y=j*Math.sqrt(3)/2; a.push([x,y,Math.hypot(x,y),Math.atan2(y,x)]); } a.sort((p,q)=>p[2]-q[2]||p[3]-q[3]); return a.filter(v=>v[2]<=10.4); })();
+const HEXR=(()=>{ const r=new Float32Array(HEX.length+1); let m=0; for(let k=0;k<HEX.length;k++){ m=Math.max(m,HEX[k][2]); r[k+1]=m; } return r; })();
+function bundleDiam(n){ return n<=0 ? 0 : CABLE_D*(2*HEXR[Math.min(n,HEX.length)]+1); }
+const STACK_ORDER=[1,4,5,2,3,0];
+function nodeStacks(net,res){
+  const {nN,nE,ea,eb,efam}=net, diam=new Float32Array(nN*6), zc=new Float32Array(nN*6), thick=new Float32Array(nN);
+  let maxLoad=0;
+  for(let e=0;e<nE;e++){ const l=res.load[e]; if(l>maxLoad) maxLoad=l; const dd=bundleDiam(l); if(!dd) continue; const f=efam[e]; if(dd>diam[ea[e]*6+f]) diam[ea[e]*6+f]=dd; if(dd>diam[eb[e]*6+f]) diam[eb[e]*6+f]=dd; }
+  for(let k=0;k<nN;k++){ let tot=0; for(let f=0;f<6;f++) tot+=diam[k*6+f]; thick[k]=tot; let cur=-tot/2;
+    for(const f of STACK_ORDER){ const dd=diam[k*6+f]; if(dd>0){ zc[k*6+f]=cur+dd/2; cur+=dd; } } }
+  const srt=Array.from(thick).filter(v=>v>0).sort((a,b)=>a-b), q=(f)=> srt.length ? srt[Math.min(srt.length-1,Math.floor(f*srt.length))] : 0;
+  let deep=0; for(const v of srt) if(v>0.05) deep++;
+  return {diam, zc, thick, p50:q(0.5), p95:q(0.95), max:srt.length?srt[srt.length-1]:0, maxLoad, maxBundle:bundleDiam(maxLoad), over5cm:deep, nodes:srt.length};
+}
+function build3D(net, res, pinch){
+  const st=nodeStacks(net,res), {nx,ny,efam}=net, H=net.H, d=CABLE_D, cab=res.cab, N=cab.length;
+  const order=cab.map(c=>c.id).sort((a,b)=>cab[a].anchorX-cab[b].anchorX), counter=new Int32Array(net.nE), slots=new Array(N);
+  for(const id of order){ const c=cab[id], sl=new Int32Array(c.edges.length); for(let q=0;q<c.edges.length;q++) sl[q]=counter[c.edges[q]]++; slots[id]=sl; }
+  let total=0; for(const c of cab) total+=2*c.edges.length+2;
+  const inst=new Float32Array(total*7), bulbs=new Float32Array(N*4); let o=0;
+  const at=(c,q,t,sc,out)=>{ const e=c.edges[q], u=c.nodes[q], v=c.nodes[q+1], ax=nx[u], ay=ny[u], bx=nx[v], by=ny[v], L=Math.hypot(bx-ax,by-ay)||1,
+      px=-(by-ay)/L, py=(bx-ax)/L, h=HEX[Math.min(slots[c.id][q],HEX.length-1)], f=efam[e], zc=st.zc[u*6+f]*(1-t)+st.zc[v*6+f]*t, oa=h[0]*d*sc, ob=h[1]*d*sc;
+    out[0]=ax+(bx-ax)*t+px*oa; out[1]=H-(ay+(by-ay)*t+py*oa); out[2]=zc+ob; };
+  const push=(a,b,id)=>{ inst[o++]=a[0]; inst[o++]=a[1]; inst[o++]=a[2]; inst[o++]=b[0]; inst[o++]=b[1]; inst[o++]=b[2]; inst[o++]=id; };
+  for(const c of cab){ const n=c.edges.length; let prev=[c.anchorX,H,0]; const cur=[0,0,0], A=[0,0,0], B=[0,0,0];
+    if(n>0){ at(c,0,0,pinch,cur); push(prev,cur,c.id); prev=cur.slice();
+      for(let q=0;q<n;q++){ at(c,q,0.5,1,cur); push(prev,cur,c.id); prev=cur.slice();
+        at(c,q,1,pinch,A); if(q+1<n){ at(c,q+1,0,pinch,B); cur[0]=(A[0]+B[0])/2; cur[1]=(A[1]+B[1])/2; cur[2]=(A[2]+B[2])/2; } else { cur[0]=A[0]; cur[1]=A[1]; cur[2]=A[2]; }
+        push(prev,cur,c.id); prev=cur.slice(); } }
+    else { cur[0]=nx[c.tie]; cur[1]=H-ny[c.tie]; cur[2]=0; push(prev,cur,c.id); prev=cur.slice(); }
+    const end=[prev[0],prev[1]-c.tail,prev[2]]; push(prev,end,c.id);
+    bulbs[4*c.id]=end[0]; bulbs[4*c.id+1]=end[1]; bulbs[4*c.id+2]=end[2]; bulbs[4*c.id+3]=c.id; }
+  return {inst, count:o/7, bulbs, stacks:st};
+}
+
 /* ───────── density map ─────────
    Cable-metres per square metre on a fine grid (segments carry load × length, bulb
    tails one cable each), smoothed by a separable box blur (3 passes ≈ Gaussian,
@@ -514,6 +557,9 @@ function fit(){ const r=cv.getBoundingClientRect(), dpr=Math.min(2,window.device
 function worldScale(){ if(!NET) return 1; const pad=30*(window.devicePixelRatio||1); return Math.min((cv.width-2*pad)/NET.W,(cv.height-2*pad)/NET.H)*zoom; }
 function toScreen(x,y){ const s=worldScale(); const ox=(cv.width-NET.W*s)/2+panX, oy=(cv.height-NET.H*s)/2+panY; return [ox+x*s, oy+y*s]; }
 function draw(){
+  const is3d=view==="3d"; $("gl3d").hidden=!is3d; cv.hidden=is3d;
+  if(!is3d && $("prog").textContent.startsWith("3D view")) $("prog").hidden=true;
+  if(is3d){ if(RES && init3D()){ upload3D(); hud3D(); req3D(); } else { hud3D(); if(G3.err){ const pr=$("prog"); pr.hidden=false; pr.textContent="3D view: "+G3.err; } } return; }
   fit(); ctx.setTransform(1,0,0,1,0,0); ctx.fillStyle="#2a2723"; ctx.fillRect(0,0,cv.width,cv.height);
   if(!NET) return; const s=worldScale(), ox=(cv.width-NET.W*s)/2+panX, oy=(cv.height-NET.H*s)/2+panY;
   ctx.fillStyle="#f2ede4"; ctx.fillRect(ox,oy,NET.W*s,NET.H*s);
@@ -575,6 +621,8 @@ function drawStats(){
     row("by direction", s.fam.map(q=>q.name+" "+f(q.mean,1)).join(" · "))+
     (()=>{ const d=getDens(); return row(`density map (${Math.round(d.sm*100)} cm)  P5 / median / P95`, `${Math.round(d.p5)} / ${Math.round(d.p50)} / ${Math.round(d.p95)} m/m²`)+
       row("… as flat cover  P5 / P95", `${f(d.p5*0.55,0)} / ${f(d.p95*0.55,0)} %`)+row("… spread (CV)", f(d.cv*100,0)+" %", d.cv<0.25?"good":d.cv<0.4?"hi":"bad"); })()+
+    (()=>{ if(!STK || STK.res!==RES){ STK=nodeStacks(NET,RES); STK.res=RES; } return row("stack depth at crossings  median / P95 / max", `${f(STK.p50*100,1)} / ${f(STK.p95*100,1)} / ${f(STK.max*100,1)} cm`)+
+      row("crossings deeper than 5 cm", `${STK.over5cm} of ${STK.nodes}`)+row("thickest bundle", `Ø ${f(STK.maxBundle*100,1)} cm · ${STK.maxLoad} cables`); })()+
     row("by height  thinnest / thickest band", `${f(s.bandMin,2)} / ${f(s.bandMax,2)}`, s.bandMin/s.bandMax>0.75?"good":"hi");
   chartBand(); chartHist();
 }
@@ -589,6 +637,176 @@ function chartHist(){ const c=$("chHist"), g=c.getContext("2d"); const dpr=windo
   g.fillStyle="#9a9186"; g.font="9px ui-monospace,monospace"; g.fillText("0",4,h-2); g.fillText("10",4+10*bw,h-2); g.fillText("20",4+20*bw,h-2); g.fillText("30+",w-20,h-2); }
 
 /* ───────── interaction ───────── */
+/* ───────── 3D view (WebGL2, no libraries) ───────── */
+let STK=null;
+const G3={gl:null, err:"", res:null, yaw:0, pitch:0, dist:12, tx:3.5, ty:3.5, tz:0, raf:0, fov:35*Math.PI/180, drag:null};
+const v3={ sub:(a,b)=>[a[0]-b[0],a[1]-b[1],a[2]-b[2]], add:(a,b)=>[a[0]+b[0],a[1]+b[1],a[2]+b[2]], mul:(a,k)=>[a[0]*k,a[1]*k,a[2]*k], dot:(a,b)=>a[0]*b[0]+a[1]*b[1]+a[2]*b[2],
+  cross:(a,b)=>[a[1]*b[2]-a[2]*b[1], a[2]*b[0]-a[0]*b[2], a[0]*b[1]-a[1]*b[0]], norm:(a)=>{ const l=Math.hypot(a[0],a[1],a[2])||1; return [a[0]/l,a[1]/l,a[2]/l]; } };
+const SH={
+tubeVS:`#version 300 es
+layout(location=0) in vec2 corner;
+layout(location=1) in vec3 p0;
+layout(location=2) in vec3 p1;
+layout(location=3) in float cid;
+uniform mat4 uView; uniform mat4 uProj; uniform float uR; uniform float uZ; uniform float uHi; uniform float uPix;
+out float vT; out vec3 vPos; out vec3 vSide; out vec3 vAxis; out float vHi; out float vRad; out float vCid;
+void main(){
+  vec4 va=uView*vec4(p0.xy,p0.z*uZ,1.0);
+  vec4 vb=uView*vec4(p1.xy,p1.z*uZ,1.0);
+  vec3 ax=vb.xyz-va.xyz; float len=length(ax);
+  vec3 ad= len>1e-7 ? ax/len : vec3(0.0,1.0,0.0);
+  float hi= abs(cid-uHi)<0.5 ? 1.0 : 0.0;
+  float r= uR*(hi>0.5 ? 2.0 : 1.0);
+  r=max(r, uPix*max(0.001,-va.z)*0.6);
+  vec3 c=mix(va.xyz,vb.xyz,corner.x)+ad*r*(corner.x*2.0-1.0);
+  vec3 toEye=normalize(-c);
+  vec3 sd=cross(ad,toEye); float sl=length(sd);
+  sd= sl>1e-6 ? sd/sl : vec3(1.0,0.0,0.0);
+  c+=sd*r*corner.y;
+  vT=corner.y; vPos=c; vSide=sd; vAxis=ad; vHi=hi; vRad=r; vCid=cid;
+  gl_Position=uProj*vec4(c,1.0);
+}`,
+tubeFS:`#version 300 es
+precision highp float;
+in float vT; in vec3 vPos; in vec3 vSide; in vec3 vAxis; in float vHi; in float vRad; in float vCid;
+uniform mat4 uProj; uniform int uColorMode;
+out vec4 outColor;
+vec3 hue(float h){ return clamp(abs(fract(h+vec3(0.0,2.0/3.0,1.0/3.0))*6.0-3.0)-1.0,0.0,1.0); }
+void main(){
+  float t=clamp(vT,-1.0,1.0); float h=sqrt(max(0.0,1.0-t*t));
+  vec3 toEye=normalize(-vPos);
+  vec3 e=toEye-vAxis*dot(toEye,vAxis); float el=length(e); e= el>1e-6 ? e/el : toEye;
+  vec3 n=normalize(vSide*t+e*h);
+  vec3 L=normalize(vec3(0.35,0.6,0.75));
+  float diff=max(dot(n,L),0.0);
+  float spec=pow(max(dot(reflect(-L,n),toEye),0.0),28.0);
+  vec3 base= vHi>0.5 ? vec3(0.09,0.40,1.0) : (uColorMode==1 ? hue(fract(vCid*0.61803))*0.6+0.04 : vec3(0.055,0.05,0.045));
+  vec3 col=base*(0.28+0.85*diff)+vec3(0.5)*spec;
+  outColor=vec4(col,1.0);
+  vec4 cp=uProj*vec4(vPos+e*vRad*h,1.0);
+  gl_FragDepth=clamp(cp.z/cp.w*0.5+0.5,0.0,1.0);
+}`,
+bulbVS:`#version 300 es
+layout(location=0) in vec2 corner;
+layout(location=1) in vec3 center;
+layout(location=2) in float bid;
+uniform mat4 uView; uniform mat4 uProj; uniform float uZ; uniform float uBR; uniform float uHi;
+out vec2 vC; out vec3 vPos; out float vHi; out float vR;
+void main(){
+  float hi= abs(bid-uHi)<0.5 ? 1.0 : 0.0; float r=uBR*(hi>0.5 ? 1.4 : 1.0);
+  vec4 c=uView*vec4(center.xy-vec2(0.0,r),center.z*uZ,1.0);
+  vC=corner; vPos=c.xyz; vHi=hi; vR=r;
+  gl_Position=uProj*vec4(c.xyz+vec3(corner*r,0.0),1.0);
+}`,
+bulbFS:`#version 300 es
+precision highp float;
+in vec2 vC; in vec3 vPos; in float vHi; in float vR;
+uniform mat4 uProj;
+out vec4 outColor;
+void main(){
+  float d2=dot(vC,vC); if(d2>1.0) discard;
+  vec3 n=vec3(vC,sqrt(1.0-d2));
+  vec3 L=normalize(vec3(0.35,0.6,0.75));
+  float diff=max(dot(n,L),0.0); float spec=pow(max(dot(reflect(-L,n),vec3(0.0,0.0,1.0)),0.0),30.0);
+  vec3 base= vHi>0.5 ? vec3(0.09,0.40,1.0) : vec3(0.85,0.55,0.18);
+  outColor=vec4(base*(0.35+0.75*diff)+vec3(0.6)*spec,1.0);
+  vec4 cp=uProj*vec4(vPos+vec3(vC*vR,n.z*vR),1.0);
+  gl_FragDepth=clamp(cp.z/cp.w*0.5+0.5,0.0,1.0);
+}`,
+lineVS:`#version 300 es
+layout(location=0) in vec3 pos;
+uniform mat4 uView; uniform mat4 uProj;
+void main(){ gl_Position=uProj*uView*vec4(pos,1.0); }`,
+lineFS:`#version 300 es
+precision highp float;
+out vec4 outColor;
+void main(){ outColor=vec4(0.10,0.37,0.84,0.5); }`
+};
+function glProgram(gl, vs, fs){
+  const mk=(type,src)=>{ const sh=gl.createShader(type); gl.shaderSource(sh,src); gl.compileShader(sh); if(!gl.getShaderParameter(sh,gl.COMPILE_STATUS)) throw new Error("shader: "+gl.getShaderInfoLog(sh)); return sh; };
+  const pr=gl.createProgram(); gl.attachShader(pr,mk(gl.VERTEX_SHADER,vs)); gl.attachShader(pr,mk(gl.FRAGMENT_SHADER,fs)); gl.linkProgram(pr);
+  if(!gl.getProgramParameter(pr,gl.LINK_STATUS)) throw new Error("link: "+gl.getProgramInfoLog(pr));
+  const u={}; const n=gl.getProgramParameter(pr,gl.ACTIVE_UNIFORMS); for(let i=0;i<n;i++){ const info=gl.getActiveUniform(pr,i); u[info.name]=gl.getUniformLocation(pr,info.name); }
+  return {pr,u};
+}
+function init3D(){
+  if(G3.gl) return true; if(G3.err) return false;
+  try{
+    const gl=$("gl3d").getContext("webgl2",{antialias:true}); if(!gl) throw new Error("WebGL2 is not available in this browser");
+    G3.tube=glProgram(gl,SH.tubeVS,SH.tubeFS); G3.bulb=glProgram(gl,SH.bulbVS,SH.bulbFS); G3.line=glProgram(gl,SH.lineVS,SH.lineFS);
+    G3.gl=gl; return true;
+  }catch(e){ G3.err=String(e.message||e); return false; }
+}
+function upload3D(){
+  const gl=G3.gl; if(G3.res===RES) return; const t0=performance.now();
+  for(const k of ["bufs"]) if(G3[k]) G3[k].forEach(b=>gl.deleteBuffer(b)); for(const k of ["vTube","vBulb","vLine"]) if(G3[k]) gl.deleteVertexArray(G3[k]);
+  const g=build3D(NET,RES,0.55); G3.bufs=[];
+  const buf=(data)=>{ const b=gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER,b); gl.bufferData(gl.ARRAY_BUFFER,data,gl.STATIC_DRAW); G3.bufs.push(b); return b; };
+  G3.vTube=gl.createVertexArray(); gl.bindVertexArray(G3.vTube);
+  buf(new Float32Array([0,-1, 0,1, 1,-1, 1,1])); gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0,2,gl.FLOAT,false,0,0);
+  buf(g.inst.subarray(0,g.count*7));
+  gl.enableVertexAttribArray(1); gl.vertexAttribPointer(1,3,gl.FLOAT,false,28,0); gl.vertexAttribDivisor(1,1);
+  gl.enableVertexAttribArray(2); gl.vertexAttribPointer(2,3,gl.FLOAT,false,28,12); gl.vertexAttribDivisor(2,1);
+  gl.enableVertexAttribArray(3); gl.vertexAttribPointer(3,1,gl.FLOAT,false,28,24); gl.vertexAttribDivisor(3,1);
+  G3.vBulb=gl.createVertexArray(); gl.bindVertexArray(G3.vBulb);
+  buf(new Float32Array([-1,-1, 1,-1, -1,1, 1,1])); gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0,2,gl.FLOAT,false,0,0);
+  buf(g.bulbs); gl.enableVertexAttribArray(1); gl.vertexAttribPointer(1,3,gl.FLOAT,false,16,0); gl.vertexAttribDivisor(1,1);
+  gl.enableVertexAttribArray(2); gl.vertexAttribPointer(2,1,gl.FLOAT,false,16,12); gl.vertexAttribDivisor(2,1);
+  G3.vLine=gl.createVertexArray(); gl.bindVertexArray(G3.vLine);
+  const lp=new Float32Array(NET.lines.length*6); NET.lines.forEach((Ln,i)=>{ lp.set([Ln.x0,NET.H-Ln.y0,0, Ln.x1,NET.H-Ln.y1,0], i*6); });
+  buf(lp); gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0,3,gl.FLOAT,false,0,0);
+  gl.bindVertexArray(null);
+  G3.count=g.count; G3.bulbN=RES.cab.length; G3.lineN=NET.lines.length*2; G3.bulbPos=g.bulbs; G3.res=RES; G3.buildMs=performance.now()-t0;
+  if(!G3.placed){ reset3D(); G3.placed=true; }
+}
+function reset3D(){ G3.yaw=0; G3.pitch=0; G3.tx=NET.W/2; G3.ty=NET.H/2; G3.tz=0; G3.dist=(Math.max(NET.W,NET.H)/2)/Math.tan(G3.fov/2)*1.08; }
+function cam3D(){ const cp=Math.cos(G3.pitch), eye=[G3.tx+G3.dist*Math.sin(G3.yaw)*cp, G3.ty+G3.dist*Math.sin(G3.pitch), G3.tz+G3.dist*Math.cos(G3.yaw)*cp];
+  const fwd=v3.norm(v3.sub([G3.tx,G3.ty,G3.tz],eye)), right=v3.norm(v3.cross(fwd,[0,1,0])), up=v3.cross(right,fwd); return {eye,fwd,right,up}; }
+function req3D(){ if(!G3.raf) G3.raf=requestAnimationFrame(()=>{ G3.raf=0; render3D(); }); }
+function render3D(){
+  const gl=G3.gl, c=$("gl3d"), dpr=Math.min(2,window.devicePixelRatio||1), w=Math.max(1,Math.round(c.clientWidth*dpr)), h=Math.max(1,Math.round(c.clientHeight*dpr));
+  if(c.width!==w||c.height!==h){ c.width=w; c.height=h; }
+  gl.viewport(0,0,w,h); gl.clearColor(0.949,0.929,0.894,1); gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT); gl.enable(gl.DEPTH_TEST); gl.disable(gl.BLEND); gl.depthMask(true);
+  const near=Math.max(0.003,G3.dist*0.001), far=G3.dist*4+NET.W*3, fy=1/Math.tan(G3.fov/2), nf=1/(near-far);
+  const proj=new Float32Array([fy*h/w,0,0,0, 0,fy,0,0, 0,0,(far+near)*nf,-1, 0,0,2*far*near*nf,0]);
+  const {eye,fwd,right,up}=cam3D();
+  const view=new Float32Array([right[0],up[0],-fwd[0],0, right[1],up[1],-fwd[1],0, right[2],up[2],-fwd[2],0, -v3.dot(right,eye),-v3.dot(up,eye),v3.dot(fwd,eye),1]);
+  const zx=+$("zExag").value||1, hi=hoverCable>=0?hoverCable:-10;
+  let T=G3.tube; gl.useProgram(T.pr); gl.uniformMatrix4fv(T.u.uView,false,view); gl.uniformMatrix4fv(T.u.uProj,false,proj);
+  gl.uniform1f(T.u.uR,CABLE_D/2); gl.uniform1f(T.u.uZ,zx); gl.uniform1f(T.u.uHi,hi); gl.uniform1f(T.u.uPix,2*Math.tan(G3.fov/2)/h); gl.uniform1i(T.u.uColorMode,$("colorEach").checked?1:0);
+  gl.bindVertexArray(G3.vTube); gl.drawArraysInstanced(gl.TRIANGLE_STRIP,0,4,G3.count);
+  if($("showBulbs").checked){ T=G3.bulb; gl.useProgram(T.pr); gl.uniformMatrix4fv(T.u.uView,false,view); gl.uniformMatrix4fv(T.u.uProj,false,proj);
+    gl.uniform1f(T.u.uZ,zx); gl.uniform1f(T.u.uBR,(P?P.bulbD:6)/200); gl.uniform1f(T.u.uHi,hi);
+    gl.bindVertexArray(G3.vBulb); gl.drawArraysInstanced(gl.TRIANGLE_STRIP,0,4,G3.bulbN); }
+  if($("showLattice").checked){ T=G3.line; gl.useProgram(T.pr); gl.uniformMatrix4fv(T.u.uView,false,view); gl.uniformMatrix4fv(T.u.uProj,false,proj);
+    gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA); gl.depthMask(false);
+    gl.bindVertexArray(G3.vLine); gl.drawArrays(gl.LINES,0,G3.lineN); gl.depthMask(true); gl.disable(gl.BLEND); }
+  gl.bindVertexArray(null);
+}
+function ray3D(e){ const c=$("gl3d"), r=c.getBoundingClientRect(), nxp=((e.clientX-r.left)/r.width)*2-1, nyp=1-((e.clientY-r.top)/r.height)*2, th=Math.tan(G3.fov/2), asp=r.width/r.height;
+  const {eye,fwd,right,up}=cam3D(); const dir=v3.norm(v3.add(v3.add(fwd, v3.mul(right,nxp*th*asp)), v3.mul(up,nyp*th)));
+  if(Math.abs(dir[2])<1e-6) return null; const t=-eye[2]/dir[2]; if(t<=0) return null; return [eye[0]+dir[0]*t, eye[1]+dir[1]*t, 0]; }
+function hud3D(){ $("hud").textContent = G3.err ? "3D: "+G3.err : `3D · drag rotate · shift- or right-drag pan · wheel zoom · double-click reset\n${G3.count.toLocaleString()} cable pieces · built in ${Math.round(G3.buildMs)} ms`; }
+(()=>{ const c=$("gl3d");
+  c.addEventListener("contextmenu",e=>e.preventDefault());
+  c.addEventListener("pointerdown",e=>{ G3.drag={x:e.clientX,y:e.clientY,pan:e.button===2||e.shiftKey}; c.setPointerCapture(e.pointerId); c.style.cursor="grabbing"; });
+  c.addEventListener("pointerup",()=>{ G3.drag=null; c.style.cursor="grab"; });
+  c.addEventListener("dblclick",()=>{ if(NET){ reset3D(); req3D(); } });
+  c.addEventListener("pointermove",e=>{ if(!G3.gl) return;
+    if(G3.drag){ const dx=e.clientX-G3.drag.x, dy=e.clientY-G3.drag.y; G3.drag.x=e.clientX; G3.drag.y=e.clientY;
+      if(G3.drag.pan){ const k=G3.dist*2*Math.tan(G3.fov/2)/c.clientHeight, {right,up}=cam3D(); const m=v3.add(v3.mul(right,-dx*k), v3.mul(up,dy*k)); G3.tx+=m[0]; G3.ty+=m[1]; G3.tz+=m[2]; }
+      else { G3.yaw-=dx*0.005; G3.pitch=clamp(G3.pitch+dy*0.005,-1.45,1.45); }
+      req3D(); return; }
+    if(!RES) return; const hit=ray3D(e); let best=-1;
+    if(hit){ const tol=Math.max(0.05, G3.dist*0.012); let bd=tol*tol; const B=G3.bulbPos; for(let i=0;i<G3.bulbN;i++){ const dx=B[4*i]-hit[0], dy=B[4*i+1]-hit[1]; const d=dx*dx+dy*dy; if(d<bd){ bd=d; best=i; } } }
+    if(best!==hoverCable){ hoverCable=best; req3D(); }
+    if(best>=0){ const cc=RES.cab[best]; $("hud").textContent=`cable ${cc.id}: ${f(cc.len,2)} m · ${cc.turns} zip ties at turns · tail ${f(cc.tail*100,0)} cm\nbeam ${f(cc.anchorX,3)} m → bulb ${f(NET.nx[cc.tie],2)}, ${f(NET.ny[cc.tie]+cc.tail,2)} m`; } else hud3D(); });
+  c.addEventListener("wheel",e=>{ e.preventDefault(); if(!G3.gl) return; const hit=ray3D(e), old=G3.dist; G3.dist=clamp(G3.dist*Math.exp(e.deltaY*0.0015),0.03,60);
+    if(hit){ const k=1-G3.dist/old; G3.tx+=(hit[0]-G3.tx)*k; G3.ty+=(hit[1]-G3.ty)*k; G3.tz+=(hit[2]-G3.tz)*k; } req3D(); },{passive:false});
+})();
+$("zExag").oninput=()=>{ $("zExagVal").textContent=$("zExag").value+"×"; if(view==="3d") req3D(); };
+$("colorEach").onchange=()=>{ if(view==="3d") req3D(); };
+
 let drag=null;
 cv.addEventListener("wheel",e=>{ e.preventDefault(); if(!NET) return; const dpr=window.devicePixelRatio||1, mx=e.offsetX*dpr, my=e.offsetY*dpr, s0=worldScale(); const ox=(cv.width-NET.W*s0)/2+panX, oy=(cv.height-NET.H*s0)/2+panY;
   const wx=(mx-ox)/s0, wy=(my-oy)/s0; zoom=clamp(zoom*Math.exp(-e.deltaY*0.0015),0.5,40); const s1=worldScale(); panX=mx-wx*s1-(cv.width-NET.W*s1)/2; panY=my-wy*s1-(cv.height-NET.H*s1)/2; draw(); },{passive:false});
