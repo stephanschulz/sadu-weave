@@ -225,7 +225,19 @@
 
     <h2>Layout</h2>
     <label class="row"><span>composition</span>
-      <select id="layout" style="flex:0 0 190px"><option value="tile">tile one motif across the wall</option><option value="lattice">diagonal lattice — two families crossing</option><option value="sadu">sadu strip — borders + centre, mirrored</option></select></label>
+      <select id="layout" style="flex:0 0 190px"><option value="tile">tile one motif across the wall</option><option value="lattice">diagonal lattice — two families crossing</option><option value="sadu">sadu strip — borders + centre, mirrored</option><option value="star">12-fold star net — the cables are the net, equal length</option></select></label>
+    <div id="starBox" class="band">
+      <div class="sect">12-fold star net</div>
+      <label>line spacing cm<input type="number" id="starSpacing" min="10" max="200" step="5"></label>
+      <label>cable length m<input type="number" id="starLen" min="1" max="40" step="0.5"></label>
+      <label>anchor jitter m<input type="number" id="starJitter" min="0" max="7" step="0.25"></label>
+      <label>max tail m<input type="number" id="starTail" min="0.05" max="3" step="0.05"></label>
+      <label class="full"><input type="checkbox" id="starExact" style="flex:0 0 auto"> exact length — whatever a cable could not wind away hangs as its tail (bulb lower); off: tails capped at max tail and the spare is only reported</label>
+      <label class="full" style="font-size:9.5px;color:var(--dim)">Six families of equally spaced lines at 30° steps (horizontal, vertical, ±30°, ±60°) through the wall's centre.
+        Every cable has the same length: from a beam crossing near its bulb (± jitter) it winds along the lines — never upward,
+        never below its bulb's row — choosing at each crossing the segment that keeps its remaining length in proportion to its
+        remaining distance, on segments few cables have used; the bulb hangs from the last crossing on what is left (up to <i>max tail</i>).</label>
+    </div>
     <div id="latticeBox" class="band">
       <div class="grid">
         <label class="full">carrier <select id="latKind"><option value="xx">two diagonal families (±θ, reflecting at the rails)</option><option value="vd">verticals + one diagonal family (diagonals end at the right rail, enter from the left rail)</option></select></label>
@@ -573,6 +585,9 @@ const GLYPH_KEYS=Object.keys(GLYPHS);
 const bd=(motif,dup,gap,phase)=>({motif,dup:dup||1,gap:gap==null?1:gap,phase:phase|0});
 const PRESETS = {
   /* newest idea first — the first preset is what the app boots into */
+  "Star net 12-fold · equal 9 m":{ layout:"star", starSpacing:0.4, cableLen:9, starJitter:1.5, starTail:0.6, tile:{motif:"ein",dup:1,gap:1,stagger:3}, lat:{figure:"none",mode:"holes",density:4,scale:2,stagger:0,gapX:1,gapY:1}, latSpacing:2, latStep:1, latPattern:false, latFlow:false, baseFrac:0.05, netPre:200, baseEnd:0.6, latAngle:45, patMoves:"diag", latFrame:"edge", latCell:1, latReach:8, grid:true, gridPitch:0.10, gridRowPitch:0, diagonal:true, maxStep:1, laneOff:0, margin:0, rowScale:1, twine:0, twinePer:4, mirror:true, maxAng:45,
+    weftEvery:0, weftPhase:0, weftFloat:6, weftStep:3, weftJitter:0, weftHops:1, weftSag:0, weftSpan:"wall", weftMax:4, edgeRails:true, ribTension:250, maxSag:40, reserve:3,
+    borders:[], centre:{glyphs:["bigDiamond"],gap:2,dup:1,rowScale:1,fit:true}},
   "Drawn · V+D eye chain (1914)":{ layout:"lattice", tile:{motif:"drawn", dup:1, gap:0, stagger:0}, lat:{figure:"none",mode:"holes",density:4,scale:2,stagger:0,gapX:1,gapY:1}, latSpacing:2, latKind:"vd", railShare:0.3, drawn:{"kind":"vd","pitch":20,"angle":45,"a":[4,-6],"b":[8,8],"segs":[[7,6,9,8],[9,6,9,8],[9,6,11,8],[9,8,9,10],[9,10,11,12],[11,6,11,8],[11,6,13,8],[11,8,11,10],[11,10,11,12],[11,12,11,14],[11,14,13,16],[13,8,13,10],[13,10,13,12],[13,10,15,12],[13,12,13,14],[13,14,13,16],[13,14,15,16],[15,12,15,14],[15,14,15,16],[23,22,25,24],[25,22,25,24],[25,22,27,24],[25,24,25,26],[25,26,27,28],[27,22,27,24],[27,22,29,24],[27,24,27,26],[27,26,27,28],[27,28,27,30],[27,30,29,32],[29,24,29,26],[29,26,29,28],[29,26,31,28],[29,28,29,30],[29,30,29,32],[29,30,31,32],[31,28,31,30],[31,30,31,32]]}, latStep:1, latPattern:false, latFlow:true, routeMode:"chain", cableLen:9, flowLight:0.02, baseFrac:0.05, netPre:200, baseEnd:0.6, latAngle:45, patMoves:"all", latFrame:"rotated", latFree:true, patSpacing:2, latMove:"straight", latWarp:"both", latTurn:0.5, latCell:1, latReach:8, grid:true, gridPitch:0.10, gridRowPitch:0, diagonal:true, maxStep:2, laneOff:0, margin:0, rowScale:1, twine:0, twinePer:4, mirror:true, maxAng:45,
     weftEvery:0, weftPhase:0, weftFloat:6, weftStep:3, weftJitter:0, weftHops:1, weftSag:0, weftSpan:"wall", weftMax:4, edgeRails:true, ribTension:250, maxSag:40, bulbDrift:0, reserve:3,
     borders:[], centre:{glyphs:["bigDiamond"],gap:2,dup:1,rowScale:1,fit:true}},
@@ -723,7 +738,7 @@ const P = {
   seed:12345, width:7, height:7, count:1000, dia:5.5, gpm:40, bulbMass:120,
   rows:32, maxDepth:6.9, margin:0, maxAng:45, snap:0, pack:1,
   grid:true, gridPitch:0.10, gridRowPitch:0, diagonal:false, maxStep:2, laneOff:0, edgeRails:true, ribTension:250, maxSag:40, reserve:3,
-  layout:"tile", tile:{motif:"ein", dup:1, gap:1, stagger:3}, latSpacing:2, latStep:1,
+  layout:"tile", tile:{motif:"ein", dup:1, gap:1, stagger:3}, starSpacing:0.4, starJitter:1.5, starTail:0.6, starExact:true, latSpacing:2, latStep:1,
   lat:{figure:"none", mode:"holes", density:4, scale:2, stagger:0, gapX:1, gapY:1},
   latPattern:false, baseFrac:0.25, netPre:100, baseEnd:0.6, latAngle:45, patMoves:"diag", latFrame:"edge", drawn:null, routeMode:"flow", cableLen:9, flowSink:true, sinkBoost:1, latKind:"xx", railShare:0.15, latFlow:false, flowLight:0.04, latFree:false, patSpacing:2, latMove:"straight", latWarp:"both", latTurn:0.5, latCell:1, latReach:8,
   rowScale:1, twine:1.0, twinePer:4, mirror:true,
@@ -806,7 +821,141 @@ function compose(P, padTo, Reff){
 const rowBits=(band,r)=> band.rows[pmod(Math.floor(r/band.rs)+band.phase, band.rows.length)];
 
 /* ═══════════════════════ GENERATOR ═══════════════════════ */
+
+/* ═══════════════════════ 12-FOLD STAR NET — equal-length cables ═══════════════════════
+   Six families of equally spaced straight lines at 30° steps (horizontal, vertical,
+   ±30°, ±60°) through the wall's centre: the 12-fold quasi-periodic net Stephan
+   identified. The NET IS THE CABLES: every cable has the same length L, starts at
+   the beam, and winds along the lines — never upward — to its own evenly placed
+   bulb. At every crossing it picks the next segment so that its remaining length
+   stays in proportion to its remaining distance (spare length → wander sideways,
+   none → head straight), preferring segments few cables have used, so the cables
+   spread over the whole net and every segment is drawn.                           */
+function generateStar(P){
+  const t0=performance.now();
+  /* a full D from the ordinary generator gives every field the views expect; the star model overwrites the geometry */
+  const T = generate(Object.assign({}, P, {layout:"lattice", latFlow:false, latPattern:false, drawn:null, latKind:"xx", latSpacing:2}), undefined);
+  const W=P.width, H=P.height, N=P.count|0, s=clamp(P.starSpacing??0.4,0.1,2), L=clamp(P.cableLen??9,1,40), tailMax=clamp(P.starTail??0.6,0.05,3);
+  const rng=mulberry32(P.seed>>>0), rngB=mulberry32((P.bulbSeed??P.seed)>>>0);
+  const cx=W/2, cy=H/2;
+  /* lines: family k has normal at k·30°; line m: n·(p−centre) = m·s */
+  const fams=[]; const lines=[];
+  for(let k=0;k<6;k++){ const a=k*Math.PI/6, nx=Math.cos(a), ny=Math.sin(a), dx=-ny, dy=nx;
+    const mMax=Math.ceil(Math.hypot(W,H)/s)+1;
+    for(let m=-mMax;m<=mMax;m++){ lines.push({k, m, nx, ny, dx, dy, px:cx+m*s*nx, py:cy+m*s*ny, nodes:[]}); } }
+  /* the wall's edges are lines too: beam, floor, rails — their crossings are the anchors and the ends */
+  const edges=[{k:6,nx:0,ny:1,dx:1,dy:0,px:0,py:0,nodes:[],edge:"top"},{k:6,nx:0,ny:1,dx:1,dy:0,px:0,py:H,nodes:[],edge:"floor"},{k:7,nx:1,ny:0,dx:0,dy:1,px:0,py:0,nodes:[],edge:"left"},{k:7,nx:1,ny:0,dx:0,dy:1,px:W,py:0,nodes:[],edge:"right"}];
+  const all=lines.concat(edges);
+  const nodes=[]; const nodeAt=new Map(); const key=(x,y)=>Math.round(x*500)+","+Math.round(y*500);
+  const getNode=(x,y)=>{ const kk=key(x,y); let nd=nodeAt.get(kk); if(!nd){ nd={id:nodes.length, x, y, adj:[], onLines:new Set()}; nodes.push(nd); nodeAt.set(kk,nd); } return nd; };
+  const inWall=(x,y)=> x>=-1e-6 && x<=W+1e-6 && y>=-1e-6 && y<=H+1e-6;
+  for(let i=0;i<all.length;i++) for(let j=i+1;j<all.length;j++){ const A=all[i], B=all[j]; if(A.k===B.k) continue;
+    const det=A.dx*(-B.dy)-(-B.dx)*A.dy; if(Math.abs(det)<1e-9) continue;               // solve A.p + ta·A.d = B.p + tb·B.d
+    const rx=B.px-A.px, ry=B.py-A.py; const ta=(rx*(-B.dy)-(-B.dx)*ry)/det; const x=A.px+ta*A.dx, y=A.py+ta*A.dy;
+    if(!inWall(x,y)) continue; const nd=getNode(clamp(x,0,W),clamp(y,0,H)); A.nodes.push({t:ta,nd}); const tb=(A.dx*ry-A.dy*rx)/det; B.nodes.push({t:tb,nd}); nd.onLines.add(i); nd.onLines.add(j); }
+  /* segments along every real line between consecutive crossings (edges of the wall carry no cable) */
+  const segs=[]; let netLen=0;
+  for(let i=0;i<lines.length;i++){ const ln=lines[i]; ln.nodes.sort((a,b)=>a.t-b.t); const seen=new Set(); const seq=[]; for(const q of ln.nodes){ if(seen.has(q.nd.id)) continue; seen.add(q.nd.id); seq.push(q.nd); }
+    for(let q=0;q+1<seq.length;q++){ const a=seq[q], b=seq[q+1]; const len=Math.hypot(b.x-a.x,b.y-a.y); if(len<1e-6) continue; const sg={id:segs.length, a, b, len, k:ln.k, line:i, use:0}; segs.push(sg); netLen+=len;
+      a.adj.push({to:b, sg}); b.adj.push({to:a, sg}); } }
+  /* bulb targets: evenly spread (blue noise), below the beam clearance */
+  const rT=Math.sqrt((W*H)/N), gap=Math.max(0.02,(P.minGap||0)/1000), top=Math.max(0.3,P.topClear||0.3);
+  const targets=[]; const cell=rT; const gw=Math.ceil(W/cell)+1, gh=Math.ceil(H/cell)+1, grid=new Array(gw*gh).fill(null).map(()=>[]);
+  const gi=(x,y)=>Math.min(gh-1,Math.floor(y/cell))*gw+Math.min(gw-1,Math.floor(x/cell));
+  const minDist=(x,y)=>{ let d=Infinity; const cxi=Math.floor(x/cell), cyi=Math.floor(y/cell); for(let yy=cyi-2;yy<=cyi+2;yy++) for(let xx=cxi-2;xx<=cxi+2;xx++){ if(xx<0||yy<0||xx>=gw||yy>=gh) continue; for(const q of grid[yy*gw+xx]) d=Math.min(d,Math.hypot(q[0]-x,q[1]-y)); } return d; };
+  const tries=Math.max(4,P.bnTries|0);
+  for(let i=0;i<N;i++){ let best=null,bd=-1; for(let t=0;t<tries;t++){ const x=rngB()*W, y=top+rngB()*(H-top); const d=minDist(x,y); if(d>bd){ bd=d; best=[x,y]; } } targets.push(best); grid[gi(best[0],best[1])].push(best); }
+  /* a target's tie: the nearest crossing at or above the bulb (the bulb hangs from it) */
+  const nodesByY=nodes.slice().sort((a,b)=>a.y-b.y);
+  /* ties are real crossings inside the wall (not rail or corner points); anchors are line ends on the beam */
+  const inner=nodes.filter(nd=>nd.adj.length>=2 && nd.x>0.05 && nd.x<W-0.05 && nd.y>1e-6);
+  const nearestNode=(x,y)=>{ let best=null,bd=Infinity; for(const nd of inner){ if(nd.y>y+1e-9) continue; const d=Math.hypot(nd.x-x,nd.y-y); if(d<bd){ bd=d; best=nd; } } return best; };
+  const topNodes=nodes.filter(nd=>nd.y<1e-6 && nd.adj.length>0).sort((a,b)=>a.x-b.x);
+  /* exact lattice distance from every crossing to a tie, over the moves a cable may make (never upward): reverse Dijkstra */
+  const distTo=(Tn)=>{ const dist=new Float64Array(nodes.length).fill(Infinity); dist[Tn.id]=0;
+    const heap=[[0,Tn.id]]; const push=(it)=>{ heap.push(it); let i=heap.length-1; while(i>0){ const p=(i-1)>>1; if(heap[p][0]<=heap[i][0]) break; [heap[p],heap[i]]=[heap[i],heap[p]]; i=p; } };
+    const pop=()=>{ const top=heap[0], last=heap.pop(); if(heap.length){ heap[0]=last; let i=0; for(;;){ let l=2*i+1, r=l+1, m=i; if(l<heap.length&&heap[l][0]<heap[m][0]) m=l; if(r<heap.length&&heap[r][0]<heap[m][0]) m=r; if(m===i) break; [heap[m],heap[i]]=[heap[i],heap[m]]; i=m; } } return top; };
+    while(heap.length){ const [d,id]=pop(); if(d>dist[id]) continue; const v=nodes[id];
+      if(v!==Tn && v.adj.length<2) continue;                                          // a dead end (a rib meeting the rail) cannot be passed through
+      for(const e of v.adj){ const u=e.to; if(v.y<u.y-1e-9) continue;               // a cable may move u→v only if v is not above u
+        if(u!==Tn && u.adj.length<2 && u.y>1e-6) continue;                              // a leaf gets no distance (a cable never enters one) — beam ends excepted, they are the entries
+        const nd=d+e.sg.len; if(nd<dist[u.id]){ dist[u.id]=nd; push([nd,u.id]); } } }
+    return dist; };
+  /* cables */
+  const cab=new Array(N), bulbs=[]; let totLen=0, arrived=0, leftoverSum=0, maxLeft=0, stuck=0, ranOut=0, missSum=0, longTails=0; const cross=new Map();
+  const order=targets.map((t,i)=>i).sort((a,b)=>targets[a][0]-targets[b][0]);
+  order.forEach((ti,rank)=>{
+    const tgt=targets[ti]; const Tn=nearestNode(tgt[0],tgt[1]) || topNodes[0];
+    /* anchor: a beam crossing near the target's x (jittered so cables must wander sideways too) from which the
+       tie is reachable with length to spare; if none is, the nearest-by-route beam crossing                      */
+    const distA=distTo(Tn); const ax=clamp(tgt[0]+(rng()-0.5)*2*clamp(P.starJitter??1.5,0,W), 0, W);
+    let an=null, ad=Infinity; for(const nd of topNodes){ const d=distA[nd.id]; if(d===Infinity) continue; if(d>L-tailMax-2*s) continue; const dx=Math.abs(nd.x-ax); if(dx<ad){ ad=dx; an=nd; } }
+    if(!an){ let bd=Infinity; for(const nd of topNodes){ const d=distA[nd.id]; if(d<bd){ bd=d; an=nd; } } }
+    if(!an){ an=topNodes[0]; for(const nd of topNodes) if(Math.abs(nd.x-ax)<Math.abs(an.x-ax)) an=nd; }
+    /* two phases.  BURN: while the cable has more length than the way to its tie
+       needs, wander — horizontals first (they use length without descending), then
+       the shallow 60° lines — on little-used segments, staying above the tie's row.
+       FINISH: once the spare fits in the tail, take the shortest way to the tie.
+       A cable never goes up, never doubles back along the line it is on.          */
+    const pts=[an.x,0]; let u=an, R=L, lastLine=-1, lastDir=0, steps=0; const visitedSeg=new Set();
+    const lineDir=(e)=> (e.to.x-e.sg.a.x-(e.to===e.sg.b?0:e.sg.b.x-e.sg.a.x)); // sign of travel along the segment's line
+    const travel=(e,from)=>{ const o = from===e.sg.a ? e.sg.b : e.sg.a; return Math.sign((o.x-from.x)*e.sg.b.x + (o.y-from.y)*e.sg.b.y - (o.x-from.x)*e.sg.a.x - (o.y-from.y)*e.sg.a.y) || 1; };
+    const dist=distA; const need=(v)=> dist[v.id];                                    // exact length of the shortest allowed route to the tie
+    while(steps++<6000){
+      if(u===Tn) break;
+      const spare = R-need(u);
+      let best=null, bestScore=Infinity;
+      let burning = spare>tailMax*0.6+1.5*s;
+      for(let attempt=0; attempt<3 && !best; attempt++, burning=false)                     // 0: wander · 1: finish · 2: finish, doubling back allowed (trap escape)
+      for(const e of u.adj){ const v=e.to; if(v.y<u.y-1e-9) continue;                    // never upward
+        if(attempt<2 && e.sg.line===lastLine && travel(e,u)===-lastDir) continue;          // no doubling back on the same line (unless trapped)
+        const Rn=R-e.sg.len, dn=need(v); if(dn===Infinity) continue;                        // from there the tie could not be reached
+        if(v===Tn){ const sc = (!burning || Rn<=tailMax) ? -10 : 5+Rn; if(sc<bestScore){ bestScore=sc; best=e; } continue; }   // finishing: the tie is always the move; the spare goes into the tail
+        if(burning && Rn<dn-1e-9) continue;                                                 // while burning, keep enough to reach the tie
+        const spareN=Rn-dn; let score;
+        if(burning){                                                                        // BURN: wander, but never into a dead end or onto the tie's own row
+          if(v.adj.length<2) continue; if(v.y>Tn.y-0.5*s) continue;
+          const horiz = e.sg.k===3, shallow = e.sg.k===2||e.sg.k===4;
+          score = (horiz?0:shallow?1.2:2.5) + 0.3*e.sg.use/(1+rank/60) + 0.3*rng() + (visitedSeg.has(e.sg.id)?3:0) + (spareN<tailMax*0.6 ? 2 : 0);
+        } else {                                                                            // FINISH: along a shortest route (dn + this step ≈ the distance from here)
+          score = (dn+e.sg.len-need(u)) + 0.02*e.sg.use + 0.01*rng(); }
+        if(score<bestScore){ bestScore=score; best=e; } }
+      if(!best) break;
+      if(R-best.sg.len < 0){ ranOut++; break; }                                           // the length ends here: the bulb hangs from this crossing
+      lastDir=travel(best,u); lastLine=best.sg.line;
+      best.sg.use++; visitedSeg.add(best.sg.id); R-=best.sg.len; u=best.to; pts.push(u.x,u.y);
+      const ck=u.id; cross.set(ck,(cross.get(ck)||0)+1);
+    }
+    if(u===Tn) arrived++; else { stuck++; missSum+=Math.hypot(u.x-Tn.x,u.y-Tn.y); }
+    const exact = P.starExact!==false;                                                  // exact: spare length hangs as the tail; else the tail is capped and the spare is reported
+    const tail=Math.max(0.02, Math.min(exact ? R : Math.min(R,tailMax), H-u.y)); if(R>tailMax){ longTails++; leftoverSum+=R-tailMax; maxLeft=Math.max(maxLeft,R-tailMax); }
+    const bx=u.x, by=Math.min(H, u.y+tail); pts.push(bx,by);
+    const used=L-R+tail;                                                                 // = L exactly unless the tail hit the floor
+    cab[ti]={id:ti, anchorX:an.x, pts, shedRow:Math.round(u.y/T.dy), bx, by, len:used, tail, node:-1, turns:Math.max(0,pts.length/2-2), hlen:0, floats:0, drop:0};
+    bulbs.push([bx,by,ti]); totLen+=used;
+  });
+  /* net drawn by how many cables ride each segment */
+  const useHist=[0,0,0,0,0]; for(const sg of segs){ const u=sg.use; useHist[u===0?0:u<3?1:u<8?2:u<15?3:4]++; }
+  const perRow=new Float64Array(T.R+1); for(const c of cab) for(let i=0;i+3<c.pts.length;i+=2){ const y0=c.pts[i+1], y1=c.pts[i+3]; const r0=Math.max(0,Math.floor(Math.min(y0,y1)/T.dy)), r1=Math.min(T.R,Math.floor(Math.max(y0,y1)/T.dy)); for(let r=r0;r<=r1;r++) perRow[r]++; }
+  const covB=new Float64Array(T.R+1), covF=new Float64Array(T.R+1), alive=new Int32Array(T.R+1);
+  for(let r=0;r<=T.R;r++){ alive[r]=Math.round(perRow[r]/Math.max(1,1)); covF[r]=Math.min(1,perRow[r]*P.dia/1000/W); covB[r]=covF[r]*0.6; }
+  let peakRow=0; for(let r=1;r<=T.R;r++) if(covB[r]>covB[peakRow]) peakRow=r;
+  /* bulb neighbour stats */
+  const nn=new Float64Array(N); let nnSum=0, nnMin=Infinity; for(let i=0;i<N;i++){ let d=Infinity; const b=bulbs[i]; for(let j=0;j<N;j++){ if(i===j) continue; const q=bulbs[j]; const dd=Math.hypot(q[0]-b[0],q[1]-b[1]); if(dd<d) d=dd; } nn[i]=d; nnSum+=d; nnMin=Math.min(nnMin,d); }
+  const nnMean=nnSum/N; let v2=0; for(let i=0;i<N;i++) v2+=(nn[i]-nnMean)**2; const cv=Math.sqrt(v2/N)/nnMean;
+  const lens=cab.map(c=>c.len);
+  const D=Object.assign({}, T, {P:{...P,borders:P.borders.map(b=>({...b})),centre:{...P.centre,glyphs:[...P.centre.glyphs]}}, N, cab, bulbs, nodes:[], crossings:[], hops:[], latHops:[], weftRows:0, weftCables:0, weftLen:0, weftOver:0, weftOverCables:0,
+    cableCross: [...cross.values()].reduce((a,b)=>a+b,0), turnsMean: cab.reduce((a,c)=>a+c.turns,0)/N, turnsMax: Math.max(...cab.map(c=>c.turns)), maxAngle:Math.PI/2,
+    covB, covF, alive, peakRow, peakCov:covB[peakRow], nn, nnMean, nnMin, cv, sliceCV:0, totLen, minL:Math.min(...lens), maxL:Math.max(...lens), meanL:totLen/N,
+    lattice:false, latPat:false, latFlow:false, gridOn:false, routeStats:null, ribRow:new Int32Array(T.R+1).fill(-1), corners:[], unsupported:0,
+    star:{spacing:s, families:6, lines:lines.filter(l=>l.nodes.length>1).length, nodes:nodes.length, segments:segs.length, netLen, cableLen:L, arrived, stuck, ranOut, missMean: stuck? missSum/stuck : 0, longTails, leftoverMean: longTails? leftoverSum/longTails : 0, maxLeft, useHist, meanUse: segs.reduce((a,q)=>a+q.use,0)/Math.max(1,segs.length)},
+    starLines: lines.filter(l=>l.nodes.length>1).map(l=>{ const q=l.nodes.slice().sort((a,b)=>a.t-b.t); return [q[0].nd.x,q[0].nd.y,q[q.length-1].nd.x,q[q.length-1].nd.y]; }),
+    ms: performance.now()-t0 });
+  return D;
+}
+
 function generate(P, planIn){
+  if(P.layout==="star" && !planIn) return generateStar(P);
   /* a bulb seed different from the design seed means two passes: the design
      seed fixes how many cables leave each strand at each row (the plan); the
      second pass keeps that plan — so every strand path and rib is identical —
@@ -1967,6 +2116,8 @@ function strokeCables(colour,lw,alpha){
 }
 /* flow: the carrier lattice — every line the cables ride — as a 1 px blue line over the cables */
 function drawCarrier(){
+  if(D.starLines){ ctx.save(); ctx.setTransform(1,0,0,1,0,0); ctx.lineWidth=1; ctx.strokeStyle = polarity? "rgba(26,95,214,.55)" : "rgba(111,168,255,.55)"; ctx.beginPath();
+    for(const [x1,y1,x2,y2] of D.starLines){ ctx.moveTo(x1*scale,y1*scale); ctx.lineTo(x2*scale,y2*scale); } ctx.stroke(); ctx.restore(); return; }
   if(!D.latFlow) return;
   ctx.save(); ctx.setTransform(1,0,0,1,0,0); ctx.lineWidth=1; ctx.strokeStyle = polarity? "#1a5fd6" : "#6fa8ff"; ctx.globalAlpha=1; ctx.beginPath();
   for(const nd of D.nodes){ for(let i=0;i<nd.path.length;i++){ const X=nd.path[i]*scale, Y=(nd.birth+i)*D.dy*scale; if(i===0) ctx.moveTo(X,Y); else ctx.lineTo(X,Y); } }
@@ -2169,7 +2320,14 @@ function drawStatsBody(){
     row("anisotropy pick : pair", fmt(aniso,1)+" : 1", aniso>1.6&&aniso<3.5?"good":"")+
     row("cables per strand at beam", D.perStrand+(D.N%D.S?"–"+(D.perStrand+1):""))+
     (D.gridOn ? row("moves", (D.diag? "diagonal · one cell per row = "+fmt(Math.atan2(D.colPitch,D.dy)*180/Math.PI,1)+"° from vertical" : "orthogonal")+" · ≤ "+D.P.maxStep+" cells per row") : row("one-pair move leans", fmt(Math.atan2(D.colPitch,D.dy)*180/Math.PI,0)+"°"))+
-    (()=>{ const c=D.layout.seq.find(b=>b.isCentre); if(D.lattice) return row("layout","diagonal lattice · start every "+D.P.latSpacing+" · "+D.P.latStep+" cell/row · ±"+fmt(D.latAngle,1)+"°");
+    (()=>{ const c=D.layout.seq.find(b=>b.isCentre);
+           if(D.star) return row("layout", `12-fold star net · spacing ${fmt(D.star.spacing*100,0)} cm · ${D.star.lines} lines · ${D.star.nodes} crossings · ${D.star.segments} segments · ${fmt(D.star.netLen,0)} m of net`)+
+             row("cables", `${D.N} × ${fmt(D.star.cableLen,1)} m = ${fmt(D.N*D.star.cableLen,0)} m · ${fmt(D.star.meanUse,1)} cables per segment`)+
+             row("segments carrying  0 · 1–2 · 3–7 · 8–14 · 15+ cables", D.star.useHist.join(" · "), D.star.useHist[0]? "" : "good")+
+             row("cables that reached their planned tie", `${D.star.arrived} of ${D.N}` + (D.star.stuck? ` · ${D.star.stuck} ran out of length first, bulb ${fmt(D.star.missMean,2)} m off on average` : ""), D.star.stuck>D.N*0.1? "bad":D.star.stuck?"":"good")+
+             row("tails longer than max tail (spare length hangs)", D.star.longTails+(D.star.longTails? ` · by ${fmt(D.star.leftoverMean,2)} m on average, ${fmt(D.star.maxLeft,2)} m at most` : ""), D.star.longTails>D.N*0.1?"bad":D.star.longTails?"":"good")+
+             row("every cable cut to", fmt(D.star.cableLen,2)+" m", "good");
+           if(D.lattice) return row("layout","diagonal lattice · start every "+D.P.latSpacing+" · "+D.P.latStep+" cell/row · ±"+fmt(D.latAngle,1)+"°");
            if(!c) return row("layout","tile · "+D.P.tile.motif+" ×"+D.layout.seq.filter(b=>!b.isGround).length+" · stagger "+D.P.tile.stagger);
            const seqRows=c.rows.length*c.rs;
            return row("centre sequence", seqRows+" picks · "+(seqRows>D.R+1? (D.R+1)+" shown":"fits"), seqRows>D.R+1?"bad":"good"); })()+
@@ -2308,6 +2466,8 @@ function syncInputs(){
   document.getElementById("saduBox").style.display = P.layout==="sadu" ? "" : "none";
   document.getElementById("tileBox").style.display = (P.layout==="tile" || (P.layout==="lattice" && P.latPattern)) ? "" : "none";
   document.getElementById("latticeBox").style.display = P.layout==="lattice" ? "" : "none";
+  document.getElementById("starBox").style.display = P.layout==="star" ? "" : "none";
+  document.getElementById("starSpacing").value=Math.round((P.starSpacing??0.4)*100); document.getElementById("starLen").value=P.cableLen??9; document.getElementById("starJitter").value=P.starJitter??1.5; document.getElementById("starTail").value=P.starTail??0.6; document.getElementById("starExact").checked=P.starExact!==false;
   document.getElementById("latSpacing").value=P.latSpacing; document.getElementById("latStep").value=P.latStep;
   document.getElementById("latAngle").value=P.latAngle; document.getElementById("patMoves").value=P.patMoves||"all";
   document.getElementById("latFrame").value=P.latFrame||"rotated"; document.getElementById("latCell").value=P.latCell; document.getElementById("latReach").value=P.latReach;
@@ -2433,6 +2593,11 @@ document.getElementById("patSpacing").addEventListener("input",e=>{ P.patSpacing
 document.getElementById("latKind").addEventListener("change",e=>{ P.latKind=e.target.value; regen(); });
 document.getElementById("railShare").addEventListener("input",e=>{ P.railShare=clamp(parseFloat(e.target.value)||0,0,0.6); regen(); });
 document.getElementById("sinkBoost").addEventListener("input",e=>{ P.sinkBoost=clamp(parseFloat(e.target.value)||1,1,2); regen(); });
+document.getElementById("starSpacing").addEventListener("input",e=>{ P.starSpacing=clamp((parseFloat(e.target.value)||40)/100,0.1,2); regen(); });
+document.getElementById("starLen").addEventListener("input",e=>{ P.cableLen=clamp(parseFloat(e.target.value)||9,1,40); regen(); });
+document.getElementById("starJitter").addEventListener("input",e=>{ P.starJitter=clamp(parseFloat(e.target.value)||0,0,7); regen(); });
+document.getElementById("starExact").addEventListener("change",e=>{ P.starExact=e.target.checked; regen(); });
+document.getElementById("starTail").addEventListener("input",e=>{ P.starTail=clamp(parseFloat(e.target.value)||0.6,0.05,3); regen(); });
 document.getElementById("routeMode").addEventListener("change",e=>{ P.routeMode=e.target.value; regen(); });
 document.getElementById("cableLen").addEventListener("input",e=>{ P.cableLen=clamp(parseFloat(e.target.value)||9,1,40); regen(); });
 document.getElementById("flowSink").addEventListener("change",e=>{ P.flowSink=e.target.checked; regen(); });
@@ -2603,7 +2768,7 @@ function applyParams(pr){
   if(src.latPattern==null) P.latPattern=false; if(src.baseFrac==null) P.baseFrac=0.25; if(src.netPre==null) P.netPre=100; if(src.baseEnd==null) P.baseEnd=0.6;
   if(src.latAngle==null){ const st=Math.max(1,P.latStep|0), rp=P.gridRowPitch>0?P.gridRowPitch:P.gridPitch; P.latAngle=Math.round(Math.atan2(st*P.gridPitch,rp)*180/Math.PI); }
   if(src.patMoves==null) P.patMoves="all";
-  if(src.latFrame==null) P.latFrame="edge"; if(src.latMove==null) P.latMove="straight"; if(src.latFree==null) P.latFree=false; if(src.latFlow==null) P.latFlow=false; if(src.flowLight==null) P.flowLight=0.04; if(src.latKind==null) P.latKind="xx"; if(src.drawn===undefined) P.drawn=null; if(src.flowSink==null) P.flowSink=true; if(src.routeMode==null) P.routeMode="flow"; if(src.cableLen==null) P.cableLen=9; if(src.sinkBoost==null) P.sinkBoost=1; if(src.railShare==null) P.railShare=0.15; if(src.patSpacing==null) P.patSpacing=2; if(src.latWarp==null || src.latWarp===false) P.latWarp="both"; else if(src.latWarp===true) P.latWarp="warp"; if(src.latTurn==null) P.latTurn=0.5; else if(src.latTurn===true) P.latTurn=1; else if(src.latTurn===false) P.latTurn=0; if(src.latReach==null) P.latReach=8; if(src.latCell==null) P.latCell=1;
+  if(src.latFrame==null) P.latFrame="edge"; if(src.latMove==null) P.latMove="straight"; if(src.latFree==null) P.latFree=false; if(src.latFlow==null) P.latFlow=false; if(src.flowLight==null) P.flowLight=0.04; if(src.latKind==null) P.latKind="xx"; if(src.drawn===undefined) P.drawn=null; if(src.flowSink==null) P.flowSink=true; if(src.routeMode==null) P.routeMode="flow"; if(src.cableLen==null) P.cableLen=9; if(src.starSpacing==null) P.starSpacing=0.4; if(src.starJitter==null) P.starJitter=1.5; if(src.starTail==null) P.starTail=0.6; if(src.starExact==null) P.starExact=true; if(src.sinkBoost==null) P.sinkBoost=1; if(src.railShare==null) P.railShare=0.15; if(src.patSpacing==null) P.patSpacing=2; if(src.latWarp==null || src.latWarp===false) P.latWarp="both"; else if(src.latWarp===true) P.latWarp="warp"; if(src.latTurn==null) P.latTurn=0.5; else if(src.latTurn===true) P.latTurn=1; else if(src.latTurn===false) P.latTurn=0; if(src.latReach==null) P.latReach=8; if(src.latCell==null) P.latCell=1;
   P.lat = Object.assign({figure:"none", mode:"holes", density:4, scale:2, stagger:0, gapX:1, gapY:1}, src.lat||{});
   if(src.bulbSeed==null) P.bulbSeed=P.seed; if(src.bulbDrift==null) P.bulbDrift=0.5; if(src.bulbReach==null) P.bulbReach=2;
   if(!src.layout) P.layout="sadu";

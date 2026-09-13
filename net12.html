@@ -1,0 +1,541 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Net12 — Pulse Qatar</title>
+<style>
+  :root{ --bg:#f2ede4; --ink:#0d0b09; --panel:#1b1916; --panel-ink:#e9e2d6; --dim:#9a9186; --line:#3a352f; --good:#7fb3a3; --bad:#e0714a; --amber:#d8a24a; --mono:ui-monospace,Menlo,monospace; }
+  html,body{ margin:0; height:100%; background:#2a2723; color:var(--panel-ink); font:13px/1.35 -apple-system,BlinkMacSystemFont,"Helvetica Neue",Arial,sans-serif; }
+  body{ display:grid; grid-template-columns:310px 1fr 300px; height:100vh; }
+  aside{ background:var(--panel); padding:10px 12px; overflow:auto; }
+  aside.left{ border-right:1px solid #000; } aside.right{ border-left:1px solid #000; }
+  h1{ font-size:14px; margin:0 0 4px; }
+  h2{ font-size:10.5px; text-transform:uppercase; letter-spacing:.08em; color:var(--dim); margin:14px 0 6px; }
+  label{ display:flex; align-items:center; justify-content:space-between; gap:8px; margin:3px 0; font-size:12px; }
+  input[type=range]{ flex:1; max-width:130px; accent-color:#7fb3a3; }
+  input[type=number]{ width:84px; background:#0f0e0c; color:var(--panel-ink); border:1px solid var(--line); border-radius:4px; padding:3px 5px; font:12px var(--mono); }
+  .btnrow{ display:flex; flex-wrap:wrap; gap:6px; margin:6px 0; }
+  button{ background:#2d2925; color:var(--panel-ink); border:1px solid #4a443c; border-radius:5px; padding:5px 9px; font-size:12px; cursor:pointer; }
+  button:hover{ background:#3a352f; } button:disabled{ opacity:.45; cursor:default; }
+  button.primary{ background:var(--good); color:#0d0b09; border-color:var(--good); font-weight:600; }
+  .seg{ display:flex; gap:0; margin:4px 0; } .seg button{ border-radius:0; flex:1; } .seg button:first-child{ border-radius:5px 0 0 5px; } .seg button:last-child{ border-radius:0 5px 5px 0; }
+  .seg button.on{ background:#4a443c; }
+  .note{ font-size:11px; color:var(--dim); margin:4px 0; }
+  main{ position:relative; overflow:hidden; background:#2a2723; }
+  canvas#cv{ position:absolute; inset:0; width:100%; height:100%; cursor:grab; }
+  #hud{ position:absolute; left:10px; bottom:8px; font:11px var(--mono); color:#e9e2d6; background:rgba(0,0,0,.55); padding:4px 7px; border-radius:4px; pointer-events:none; white-space:pre; }
+  #prog{ position:absolute; left:50%; top:12px; transform:translateX(-50%); font:12px var(--mono); background:rgba(0,0,0,.7); padding:5px 10px; border-radius:5px; pointer-events:none; }
+  .stat{ display:flex; justify-content:space-between; gap:8px; font-size:11.5px; padding:2px 0; border-bottom:1px solid #26231f; }
+  .stat b{ font:11.5px var(--mono); font-weight:500; text-align:right; }
+  .stat.good b{ color:var(--good); } .stat.bad b{ color:var(--bad); } .stat.hi b{ color:var(--amber); }
+  canvas.chart{ width:100%; height:130px; background:#141210; border-radius:4px; display:block; margin:4px 0; }
+</style>
+</head>
+<body>
+<aside class="left">
+  <h1>Net12 — 12-fold cable net</h1>
+  <p class="note">Six line families — horizontal, vertical, ±30°, ±60° — form the base lattice. 1000 cables of equal length start at the beam, travel only along the lattice (any direction, zip-tied at turns) and end at randomly placed bulbs, spending their length where the net has the fewest cables so far.</p>
+
+  <h2>Wall &amp; lattice</h2>
+  <label>wall width m <input type="number" id="W" value="7" min="1" max="30" step="0.5"></label>
+  <label>wall height m <input type="number" id="H" value="7" min="1" max="30" step="0.5"></label>
+  <label>rows &amp; columns <input type="number" id="cells" value="52" min="4" max="120" step="1"></label>
+  <label><span>diagonal families (±30°, ±60°)</span><input type="checkbox" id="diagonals" checked></label>
+  <label>diagonal spacing × <input type="number" id="diagMult" value="1" min="0.5" max="4" step="0.25"></label>
+  <label>merge crossings closer than cm <input type="number" id="snap" value="1.5" min="0" max="5" step="0.25"></label>
+
+  <h2>Cables &amp; bulbs</h2>
+  <label>bulbs / cables <input type="number" id="N" value="1000" min="10" max="3000" step="10"></label>
+  <label>cable length m <input type="number" id="L" value="12" min="1" max="40" step="0.5"></label>
+  <div class="btnrow"><button id="suggestL">set length for even density</button></div>
+  <label>bulb tail min cm <input type="number" id="tailMin" value="5" min="1" max="100" step="1"></label>
+  <label>bulb tail max cm <input type="number" id="tailMax" value="30" min="2" max="200" step="1"></label>
+  <label>no bulbs above cm <input type="number" id="topClear" value="30" min="0" max="300" step="5"></label>
+  <label>run between ties min cm <input type="number" id="runMin" value="25" min="2" max="300" step="5"></label>
+  <label>run between ties max cm <input type="number" id="runMax" value="90" min="5" max="500" step="5"></label>
+  <label>balancing passes <input type="number" id="passes" value="4" min="0" max="20" step="1"></label>
+  <label>seed <input type="number" id="seed" value="1"></label>
+  <label>bulb seed <input type="number" id="bulbSeed" value="1"></label>
+  <div class="btnrow"><button id="gen" class="primary">generate</button><button id="newBulbs">new bulb layout</button><button id="newSeed">new routing</button></div>
+
+  <h2>View</h2>
+  <div class="seg" id="viewSeg"><button data-v="cables" class="on">cables</button><button data-v="heat">load heat</button><button data-v="lattice">lattice</button></div>
+  <label><span>lattice lines (blue)</span><input type="checkbox" id="showLattice" checked></label>
+  <label><span>bulbs and tails</span><input type="checkbox" id="showBulbs" checked></label>
+  <label><span>uncovered segments (red)</span><input type="checkbox" id="showUncov" checked></label>
+  <label><span>cable opacity <b id="cableAlphaVal" style="font:11px ui-monospace,monospace">100 %</b></span><input type="range" id="cableAlpha" min="5" max="100" step="1" value="100"></label>
+  <p class="note">Wheel zooms, drag pans, double-click resets. Hover near a bulb to follow its cable (white dots = zip ties at its turns).</p>
+
+  <h2>Export</h2>
+  <div class="btnrow"><button id="exSvg">SVG</button><button id="exPng">PNG</button><button id="exJson">cables JSON</button><button id="exCsv">cables CSV</button><button id="exTies">ties CSV</button></div>
+  <p class="note">Downloads need the page opened from file://.</p>
+</aside>
+
+<main><canvas id="cv"></canvas><div id="hud"></div><div id="prog" hidden></div></main>
+
+<aside class="right">
+  <h2>Lattice</h2><div id="stLat"></div>
+  <h2>Cables</h2><div id="stCab"></div>
+  <h2>Density</h2><div id="stDen"></div>
+  <p class="note">Cables per segment by height (0.5 m bands) — flat means even density:</p>
+  <canvas class="chart" id="chBand"></canvas>
+  <p class="note">Segments by number of cables:</p>
+  <canvas class="chart" id="chHist"></canvas>
+</aside>
+
+<script>
+"use strict";
+/*CORE-BEGIN*/
+/* a zip-tied bundle of n round 5.5 mm cables is about 1.05·√n cable diameters wide */
+const bundleW=(n)=> n<=0 ? 0 : 0.0055*1.05*Math.sqrt(n);
+function mulberry32(a){ return function(){ a|=0; a=a+0x6D2B79F5|0; let t=Math.imul(a^a>>>15,1|a); t=t+Math.imul(t^t>>>7,61|t)^t; return ((t^t>>>14)>>>0)/4294967296; }; }
+const clamp=(v,a,b)=> v<a?a : v>b?b : v;
+
+/* ───────── base lattice ─────────
+   Families of equally spaced lines through the wall's centre. The horizontal and
+   vertical families land exactly on the wall's edges (beam, floor, rails), so every
+   diagonal ends on another line and nothing dangles. Crossings closer than `snap`
+   are merged into one node (one zip-tie point). Each line becomes a sequence of
+   nodes; consecutive nodes are a segment.                                           */
+function buildNet(p){
+  const t0=Date.now();
+  const W=p.W, H=p.H, cols=Math.max(2,Math.round(p.cells)), sx=W/cols, rows=Math.max(2,Math.round(H/sx)), sy=H/rows, sd=((sx+sy)/2)*p.diagMult;
+  const cx=W/2, cy=H/2;
+  const famDefs=[{deg:0,sp:sy,name:"H"},{deg:90,sp:sx,name:"V"}];
+  if(p.diagonals) famDefs.push({deg:30,sp:sd,name:"+30"},{deg:150,sp:sd,name:"-30"},{deg:60,sp:sd,name:"+60"},{deg:120,sp:sd,name:"-60"});
+  const lines=[];
+  famDefs.forEach((f,fi)=>{
+    const a=f.deg*Math.PI/180, dx=Math.cos(a), dy=Math.sin(a), nx=-dy, ny=dx;
+    const reach=W/2*Math.abs(nx)+H/2*Math.abs(ny), mMax=Math.floor(reach/f.sp+1e-7);
+    for(let m=-mMax;m<=mMax;m++){
+      const px=cx+m*f.sp*nx, py=cy+m*f.sp*ny; let t0=-1e9, t1=1e9, ok=true;
+      const slab=(p0,d,lo,hi)=>{ if(Math.abs(d)<1e-12){ if(p0<lo-1e-7||p0>hi+1e-7) ok=false; return; } let ta=(lo-p0)/d, tb=(hi-p0)/d; if(ta>tb){ const q=ta; ta=tb; tb=q; } if(ta>t0) t0=ta; if(tb<t1) t1=tb; };
+      slab(px,dx,0,W); slab(py,dy,0,H);
+      if(!ok || t1-t0<1e-6) continue;
+      lines.push({fam:fi, px, py, dx, dy, t0, t1, pts:[]});
+    }
+  });
+  /* crossings */
+  const P=[];
+  for(let i=0;i<lines.length;i++){ const A=lines[i];
+    for(let j=i+1;j<lines.length;j++){ const B=lines[j]; if(A.fam===B.fam) continue;
+      const den=A.dx*B.dy-A.dy*B.dx; if(Math.abs(den)<1e-12) continue;
+      const qx=B.px-A.px, qy=B.py-A.py, ta=(qx*B.dy-qy*B.dx)/den, tb=(qx*A.dy-qy*A.dx)/den;
+      if(ta<A.t0-1e-7||ta>A.t1+1e-7||tb<B.t0-1e-7||tb>B.t1+1e-7) continue;
+      const id=P.length/2; P.push(clamp(A.px+ta*A.dx,0,W), clamp(A.py+ta*A.dy,0,H)); A.pts.push([ta,id]); B.pts.push([tb,id]); } }
+  /* merge crossings closer than snap */
+  const tol=Math.max(p.snap/100,1e-6), cs=tol, np=P.length/2, cl=new Int32Array(np), cxs=[], cys=[], cnt=[], grid=new Map();
+  for(let k=0;k<np;k++){ const x=P[2*k], y=P[2*k+1], gx=Math.floor(x/cs), gy=Math.floor(y/cs); let found=-1, bd=tol*tol;
+    for(let ox=-1;ox<=1;ox++) for(let oy=-1;oy<=1;oy++){ const arr=grid.get((gx+ox)*1000003+(gy+oy)); if(!arr) continue;
+      for(const c of arr){ const ddx=cxs[c]-x, ddy=cys[c]-y, d2=ddx*ddx+ddy*ddy; if(d2<=bd){ bd=d2; found=c; } } }
+    if(found<0){ found=cxs.length; cxs.push(x); cys.push(y); cnt.push(1); const key=gx*1000003+gy; if(!grid.has(key)) grid.set(key,[]); grid.get(key).push(found); }
+    else { cnt[found]++; cxs[found]+=(x-cxs[found])/cnt[found]; cys[found]+=(y-cys[found])/cnt[found]; }
+    cl[k]=found; }
+  const nN=cxs.length, nx=Float64Array.from(cxs), ny=Float64Array.from(cys);
+  for(let k=0;k<nN;k++){ if(ny[k]<tol+1e-9) ny[k]=0; if(ny[k]>H-tol-1e-9) ny[k]=H; if(nx[k]<tol+1e-9) nx[k]=0; if(nx[k]>W-tol-1e-9) nx[k]=W; }
+  /* lines → node sequences → segments */
+  const ea=[], eb=[], elen=[], eline=[], efam=[], ekey=new Map(), seqs=[], eseqs=[], slots=[], nodeLines=Array.from({length:nN},()=>[]);
+  lines.forEach((Ln,li)=>{
+    Ln.pts.sort((a,b)=>a[0]-b[0]); const seq=[]; for(const [,pid] of Ln.pts){ const c=cl[pid]; if(seq.length && seq[seq.length-1]===c) continue; seq.push(c); }
+    const es=[], sl=[];
+    for(let i=0;i+1<seq.length;i++){ const a=seq[i], b=seq[i+1], key=a<b ? a*nN+b : b*nN+a; let e=ekey.get(key);
+      if(e===undefined){ e=ea.length; ekey.set(key,e); ea.push(a); eb.push(b); elen.push(Math.hypot(nx[b]-nx[a],ny[b]-ny[a])); eline.push(li); efam.push(Ln.fam); }
+      es.push(e); }
+    for(let i=0;i<seq.length;i++){ const c=seq[i]; sl.push(nodeLines[c].length/2); nodeLines[c].push(li,i); }
+    seqs.push(seq); eseqs.push(es); slots.push(sl);
+    Ln.x0=Ln.px+Ln.t0*Ln.dx; Ln.y0=Ln.py+Ln.t0*Ln.dy; Ln.x1=Ln.px+Ln.t1*Ln.dx; Ln.y1=Ln.py+Ln.t1*Ln.dy; delete Ln.pts;
+  });
+  const nE=ea.length; let netLen=0, maxSlots=1; for(let e=0;e<nE;e++) netLen+=elen[e]; for(let k=0;k<nN;k++) maxSlots=Math.max(maxSlots,nodeLines[k].length/2);
+  const net={W,H,cols,rows,sx,sy,sd,famDefs,lines,nN,nE,nx,ny,ea:Int32Array.from(ea),eb:Int32Array.from(eb),elen:Float64Array.from(elen),eline:Int32Array.from(eline),efam:Int32Array.from(efam),
+    seqs,eseqs,slots,nodeLines,maxSlots,netLen,crossings:np,merged:np-nN};
+  /* beam nodes, node grid, the cut just under the beam */
+  net.topNodes=[]; for(let k=0;k<nN;k++) if(ny[k]===0 && nodeLines[k].length>0) net.topNodes.push(k); net.topNodes.sort((a,b)=>nx[a]-nx[b]);
+  net.gcell=0.2; net.gw=Math.ceil(W/net.gcell)+1; net.gh=Math.ceil(H/net.gcell)+1; net.ngrid=Array.from({length:net.gw*net.gh},()=>[]);
+  for(let k=0;k<nN;k++) net.ngrid[Math.floor(ny[k]/net.gcell)*net.gw+Math.floor(nx[k]/net.gcell)].push(k);
+  const yCut=Math.min(sy,0.1)/2; let cut=0; for(let e=0;e<nE;e++){ const ya=ny[ea[e]], yb=ny[eb[e]]; if(Math.min(ya,yb)<yCut && Math.max(ya,yb)>yCut) cut++; }
+  net.topCut=cut;
+  net.bands=Math.ceil(H/0.5); net.bandLen=new Float64Array(net.bands); for(let e=0;e<nE;e++){ const ym=(ny[ea[e]]+ny[eb[e]])/2; net.bandLen[Math.min(net.bands-1,Math.floor(ym/0.5))]+=elen[e]; }
+  net.ms=Date.now()-t0;
+  return net;
+}
+
+/* ───────── bulbs: random, but no two too close (best of k candidates) ───────── */
+function placeBulbs(p, net, rng){
+  const N=p.N, W=net.W, H=net.H, top=p.topClear/100, bot=Math.max(0.05,p.tailMax/100), k=12;
+  const cell=Math.sqrt(W*(H-top)/N), gw=Math.ceil(W/cell)+1, gh=Math.ceil(H/cell)+1, g=Array.from({length:gw*gh},()=>[]), pts=[];
+  const near=(x,y)=>{ let d=Infinity; const cxi=Math.floor(x/cell), cyi=Math.floor(y/cell);
+    for(let yy=cyi-2;yy<=cyi+2;yy++) for(let xx=cxi-2;xx<=cxi+2;xx++){ if(xx<0||yy<0||xx>=gw||yy>=gh) continue; for(const q of g[yy*gw+xx]){ const dd=Math.hypot(q[0]-x,q[1]-y); if(dd<d) d=dd; } } return d; };
+  for(let i=0;i<N;i++){ let best=null, bd=-1;
+    for(let t=0;t<k;t++){ const x=0.03+rng()*(W-0.06), y=top+rng()*Math.max(0.01,H-top-bot); const d=near(x,y); if(d>bd){ bd=d; best=[x,y]; } }
+    pts.push(best); g[Math.floor(best[1]/cell)*gw+Math.floor(best[0]/cell)].push(best); }
+  return pts;
+}
+
+/* ───────── router ─────────
+   A cable moves in RUNS: it follows one lattice line for runMin…runMax, then decides
+   again (a zip tie wherever it changes line). Each run is scored by how far the
+   segments it covers are below the target count (uncovered segments count most,
+   segments this cable already used count against). It keeps going while its
+   remaining length exceeds the way to its bulb (1.04 × straight distance — on a net
+   with a line every 30° the lattice route is within 3.5 % of straight); then a
+   bounded search (lattice-only, turns cost a little) picks the tie node near the
+   bulb whose route leaves a tail between tailMin and tailMax. Afterwards cables
+   near still-uncovered segments and a random share of all cables are ripped up and
+   routed again against the updated counts.                                           */
+function* routeAll(p, net, bulbs, seed){
+  const rng=mulberry32(seed>>>0), N=bulbs.length, {nN,nE,nx,ny,ea,eb,elen,eline,seqs,eseqs,slots,nodeLines,maxSlots}=net;
+  const L=p.L, tailMin=p.tailMin/100, tailMax=Math.max(tailMin+0.01,p.tailMax/100), tailMid=(tailMin+tailMax)/2, runMin=p.runMin/100, runMax=Math.max(runMin,p.runMax/100);
+  const load=new Int32Array(nE);
+  /* anchors: N places along the beam, each to the bulb of the same rank in x */
+  const order=bulbs.map((b,i)=>i).sort((a,b)=>bulbs[a][0]-bulbs[b][0]);
+  const cab=new Array(N); const tops=net.topNodes;
+  order.forEach((bi,rank)=>{ const ax=(rank+0.5)*net.W/N; let lo=0, hi=tops.length-1; while(lo<hi){ const m=(lo+hi)>>1; if(nx[tops[m]]<ax) lo=m+1; else hi=m; }
+    let t=tops[lo]; if(lo>0 && Math.abs(nx[tops[lo-1]]-ax)<Math.abs(nx[t]-ax)) t=tops[lo-1];
+    cab[bi]={id:bi, force:-1, anchorX:ax, top:t, stub:Math.abs(nx[t]-ax), bulb:bulbs[bi], nodes:[], edges:[], tie:-1, tail:0, over:0, longTail:0, turns:0, up:0, len:0}; });
+  let meanStub=0; for(const c of cab) meanStub+=c.stub; meanStub/=N;
+  const target=Math.max(0.5, N*(L-tailMid-meanStub)/net.netLen);
+  let covBonus=2; const PULL=p.pull??0.9, GAINW=p.gainW??0.6, FAMW=p.famW??0.5, FLOORB=p.floorB??1.2;
+  /* coarse density field: target cable-metres per cell vs laid cable-metres */
+  const dc=0.5, dgw=Math.ceil(net.W/dc), dgh=Math.ceil(net.H/dc), cellT=new Float64Array(dgw*dgh), cellL=new Float64Array(dgw*dgh), cellR=new Float64Array(dgw*dgh), ecell=new Int32Array(nE);
+  for(let e=0;e<nE;e++){ const xm=(nx[ea[e]]+nx[eb[e]])/2, ym=(ny[ea[e]]+ny[eb[e]])/2; const c=Math.min(dgh-1,Math.floor(ym/dc))*dgw+Math.min(dgw-1,Math.floor(xm/dc)); ecell[e]=c; cellT[c]+=elen[e]*target; }
+  const nF=net.famDefs.length, famLen=new Float64Array(nF), famCab=new Float64Array(nF); for(let e=0;e<nE;e++) famLen[net.efam[e]]+=elen[e];
+  const famPen=(f)=> FAMW*(famCab[f]/Math.max(1e-9,famLen[f])/target-1);
+  const addLoad=(e,k)=>{ load[e]+=k; cellL[ecell[e]]+=k*elen[e]; famCab[net.efam[e]]+=k*elen[e]; };
+  const wpSpend=p.wpSpend??3.5;
+  function pickWaypoint(u,R,Tx,Ty){ let best=-1, bs=-Infinity;
+    for(let c=0;c<dgw*dgh;c++){ if(cellT[c]<=0) continue; const wx=(c%dgw+0.5)*dc, wy=(Math.floor(c/dgw)+0.5)*dc;
+      const need=1.04*(Math.hypot(wx-nx[u],wy-ny[u])+Math.hypot(Tx-wx,Ty-wy))+tailMid+wpSpend*0.5; if(need>R) continue;
+      const def=(cellT[c]-cellL[c]-cellR[c])/cellT[c]; const sc=def*(1+FLOORB*wy/net.H)+0.15*rng()-0.02*Math.hypot(wx-nx[u],wy-ny[u]); if(sc>bs){ bs=sc; best=c; } }
+    if(best<0 || bs<0.02) return null; return {c:best, x:(best%dgw+0.5)*dc, y:(Math.floor(best/dgw)+0.5)*dc}; }
+  const benefit=(e)=>{ const ld=load[e]; return ld===0 ? covBonus : clamp((target-ld)/target,-1.5,1); };
+
+  /* bounded search state arrays (state = node × slot × direction) */
+  const S=nN*maxSlots*2, stamp=new Int32Array(S), cost=new Float64Array(S), rlen=new Float64Array(S), parS=new Int32Array(S), parE=new Int32Array(S);
+  let curStamp=0; const heapK=[], heapS=[];
+  const hpush=(k,s)=>{ heapK.push(k); heapS.push(s); let i=heapK.length-1; while(i>0){ const q=(i-1)>>1; if(heapK[q]<=heapK[i]) break; [heapK[q],heapK[i]]=[heapK[i],heapK[q]]; [heapS[q],heapS[i]]=[heapS[i],heapS[q]]; i=q; } };
+  const hpop=()=>{ const s=heapS[0], k=heapK[0], lk=heapK.pop(), ls=heapS.pop(); if(heapK.length){ heapK[0]=lk; heapS[0]=ls; let i=0; for(;;){ const l=2*i+1, r=l+1; let m=i; if(l<heapK.length&&heapK[l]<heapK[m]) m=l; if(r<heapK.length&&heapK[r]<heapK[m]) m=r; if(m===i) break; [heapK[m],heapK[i]]=[heapK[i],heapK[m]]; [heapS[m],heapS[i]]=[heapS[i],heapS[m]]; i=m; } } return [k,s]; };
+
+  function chooseRun(u,inLine,inDir,R,Tx,Ty,self,cap,wp,allowBack){
+    const rMin=allowBack?0:Math.min(runMin,cap*0.5), rMax=Math.min(runMax,cap); let best=null, bestSc=-Infinity; const nl=nodeLines[u];
+    for(let q=0;q<nl.length;q+=2){ const li=nl[q], i=nl[q+1], seq=seqs[li], es=eseqs[li];
+      const fp=famPen(net.lines[li].fam);
+      for(const d of [-1,1]){ if(li===inLine && d===-inDir && !allowBack) continue;
+        let j=i, len=0, gain=0;
+        for(;;){ const k=j+d; if(k<0||k>=seq.length) break; const e=es[d>0?j:k], el=elen[e]; if(len+el>rMax+1e-9 && len>0) break;
+          len+=el; gain+=el*benefit(e); if(self.has(e)) gain-=el*2.5; j=k;
+          if(len>=rMin){ const end=seq[j], dEnd=Math.hypot(nx[end]-Tx,ny[end]-Ty);
+            if(R-len >= 1.04*dEnd+tailMid){ const pull = wp ? PULL*(Math.hypot(nx[u]-wp.x,ny[u]-wp.y)-Math.hypot(nx[end]-wp.x,ny[end]-wp.y))/len : 0;
+            const sc=(wp?GAINW:1)*gain/len - fp + (li===inLine&&d===-inDir?-3:0) + pull + 0.06*len + (li!==inLine?-0.02:0) + 0.22*rng(); if(sc>bestSc){ bestSc=sc; best={li,i,d,j,len}; } } } } } }
+    return best;
+  }
+  function applyRun(c,run,self){ const seq=seqs[run.li], es=eseqs[run.li]; let j=run.i;
+    while(j!==run.j){ const k=j+run.d, e=es[run.d>0?j:k]; c.edges.push(e); c.nodes.push(seq[k]); addLoad(e,1); self.add(e); if(ny[seq[k]]<ny[seq[j]]-1e-9) c.up+=elen[e]; j=k; } }
+
+  /* from node u (arrived on inLine/inDir), search the lattice to the tie candidates near (Tx,Ty) */
+  function approach(u,inLine,inDir,R,Tx,Ty,self,pure,candIn,bx,by){
+    let cand=candIn?candIn.slice():[]; if(!candIn) for(let rad=Math.max(0.14,net.sx*1.1); rad<=0.8 && cand.length<3; rad*=1.6){ cand=[];
+      const gx0=Math.floor((Tx-rad)/net.gcell), gx1=Math.floor((Tx+rad)/net.gcell), gy0=Math.floor((Ty-rad)/net.gcell), gy1=Math.floor((Ty+rad)/net.gcell);
+      for(let gy=Math.max(0,gy0);gy<=Math.min(net.gh-1,gy1);gy++) for(let gx=Math.max(0,gx0);gx<=Math.min(net.gw-1,gx1);gx++) for(const k of net.ngrid[gy*net.gw+gx]){
+        if(Math.abs(nx[k]-Tx)<=rad*0.6 && Math.abs(ny[k]-Ty)<=rad && nodeLines[k].length>0) cand.push(k); } }
+    if(!cand.length) return null;
+    const isCand=new Map(); cand.forEach((k,i)=>isCand.set(k,i)); const bestS=new Int32Array(cand.length).fill(-1);
+    curStamp++; heapK.length=0; heapS.length=0; const turnCost=0.04, mMin=pure?1:0.55;
+    const sid=(node,slot,d)=> (node*maxSlots+slot)*2+(d>0?1:0);
+    const relax=(s,k,rl,ps,pe)=>{ if(stamp[s]===curStamp && cost[s]<=k) return; stamp[s]=curStamp; cost[s]=k; rlen[s]=rl; parS[s]=ps; parE[s]=pe; const node=Math.floor(s/2/maxSlots);
+      hpush(k+mMin*Math.max(0,Math.hypot(nx[node]-Tx,ny[node]-Ty)-0.3), s); };
+    /* seed: every move out of u */
+    const nlU=nodeLines[u];
+    for(let q=0;q<nlU.length;q+=2){ const li=nlU[q], i=nlU[q+1], seq=seqs[li], es=eseqs[li], sl=slots[li];
+      for(const d of [-1,1]){ if(li===inLine && d===-inDir) continue; const k=i+d; if(k<0||k>=seq.length) continue; const e=es[d>0?i:k];
+        const m = pure ? 1 : (load[e]===0?0.55:0.7+0.8*clamp(load[e]/target,0,1.5))*(self.has(e)?2.5:1)*Math.max(0.6,1+famPen(net.efam[e]));
+        if(elen[e]>R-tailMin+1e-9) continue; relax(sid(seq[k],sl[k],d), elen[e]*m, elen[e], -1, e); } }
+    let pops=0, settled=0;
+    while(heapK.length && pops++<60000){ const [key,s]=hpop(); const node=Math.floor(s/2/maxSlots), slot=Math.floor(s/2)%maxSlots, dIn=(s&1)?1:-1;
+      if(stamp[s]!==curStamp || key-mMin*Math.max(0,Math.hypot(nx[node]-Tx,ny[node]-Ty)-0.3)>cost[s]+1e-9) continue;
+      const ci=isCand.get(node); if(ci!==undefined){ const b=bestS[ci]; if(b<0){ bestS[ci]=s; settled++; if(settled===cand.length) break; } }
+      const liIn=nodeLines[node][slot*2], nl=nodeLines[node];
+      for(let q=0;q<nl.length;q+=2){ const li=nl[q], i=nl[q+1], seq=seqs[li], es=eseqs[li], sl=slots[li];
+        for(const d of [-1,1]){ if(li===liIn && d===-dIn) continue; const k=i+d; if(k<0||k>=seq.length) continue; const e=es[d>0?i:k], v=seq[k];
+          const nrl=rlen[s]+elen[e]; if(nrl+Math.hypot(nx[v]-Tx,ny[v]-Ty)-0.4>R-tailMin) continue;
+          const m = pure ? 1 : (load[e]===0?0.55:0.7+0.8*clamp(load[e]/target,0,1.5))*(self.has(e)?2.5:1)*Math.max(0.6,1+famPen(net.efam[e]));
+          relax(sid(v,sl[k],d), cost[s]+elen[e]*m+(li!==liIn?turnCost:0), nrl, s, e); } } }
+    /* pick the tie: tail in range, cheapest; else report long/short */
+    let ok=null, okC=Infinity, longB=null, longL=Infinity, shortB=null, shortL=-Infinity;
+    cand.forEach((k,ci)=>{ const s=bestS[ci]; if(s<0) return; const left=R-rlen[s];
+      if(left>=tailMin && left<=tailMax){ const sc=cost[s]+Math.abs(left-tailMid)*0.5; if(sc<okC){ okC=sc; ok=s; } }
+      else if(left>tailMax){ if(left<longL){ longL=left; longB=s; } }
+      else if(left>shortL){ shortL=left; shortB=s; } });
+    const pick=(s,status)=>{ const edges=[], nodes=[]; let t=s; while(t>=0){ edges.push(parE[t]); nodes.push(Math.floor(t/2/maxSlots)); t=parS[t]; } edges.reverse(); nodes.reverse();
+      return {status, edges, nodes, left:R-rlen[s], tie:nodes[nodes.length-1], lastLine:nodeLines[nodes[nodes.length-1]][(Math.floor(s/2)%maxSlots)*2], lastDir:(s&1)?1:-1}; };
+    if(candIn){ let bs=-1, bc=Infinity; cand.forEach((k,ci)=>{ const s=bestS[ci]; if(s<0) return; if(R-rlen[s]>=1.04*Math.hypot(nx[k]-bx,ny[k]-by)+tailMid && cost[s]<bc){ bc=cost[s]; bs=s; } }); return bs<0?null:pick(bs,"ok"); }
+    if(ok!==null) return pick(ok,"ok"); if(longB!==null) return pick(longB,"long"); if(shortB!==null) return pick(shortB,"short"); return null;
+  }
+
+  function applyPath(c,res,u,self){ for(let q=0;q<res.edges.length;q++){ const e=res.edges[q], v=res.nodes[q], from=q?res.nodes[q-1]:u; c.edges.push(e); c.nodes.push(v); addLoad(e,1); self.add(e); if(ny[v]<ny[from]-1e-9) c.up+=elen[e]; } }
+  function route(c){
+    c.trace=p.trace?[]:null; const self=new Set(); c.nodes=[c.top]; c.edges=[]; c.up=0; c.over=0; c.longTail=0;
+    let u=c.top, R=L-c.stub, inLine=-1, inDir=0, mode="spend", extra=0, guard=0, wp=null, wpLeft=0, forceSteps=0;
+    const Tx=c.bulb[0], Ty=c.bulb[1]-tailMid;
+    while(guard++<3000){
+      if(mode==="spend" && c.force>=0){ const e=c.force, fmx=(nx[ea[e]]+nx[eb[e]])/2, fmy=(ny[ea[e]]+ny[eb[e]])/2;
+        if(load[e]===0 && Math.hypot(nx[u]-fmx,ny[u]-fmy)>0.5 && forceSteps++<300){ const fw={x:fmx,y:fmy};
+          let run=chooseRun(u,inLine,inDir,R,Tx,Ty,self,Infinity,fw); if(!run) run=chooseRun(u,inLine,inDir,R,Tx,Ty,self,Infinity,fw,true);
+          if(run){ applyRun(c,run,self); R-=run.len; u=seqs[run.li][run.j]; inLine=run.li; inDir=run.d; continue; } }
+        c.force=-1;
+        if(load[e]===0){ const r=approach(u,inLine,inDir,R,(nx[ea[e]]+nx[eb[e]])/2,(ny[ea[e]]+ny[eb[e]])/2,self,false,[ea[e],eb[e]],Tx,Ty);
+          if(r && r.edges.length){ applyPath(c,r,u,self); R=r.left; u=r.tie; inLine=r.lastLine; inDir=r.lastDir;
+            const li=eline[e], other=u===ea[e]?eb[e]:ea[e], nl=nodeLines[u]; let i=-1; for(let q=0;q<nl.length;q+=2) if(nl[q]===li){ i=nl[q+1]; break; }
+            if(i>=0 && load[e]===0){ const d=seqs[li][i+1]===other?1:-1; c.edges.push(e); c.nodes.push(other); addLoad(e,1); self.add(e); if(ny[other]<ny[u]-1e-9) c.up+=elen[e]; R-=elen[e]; u=other; inLine=li; inDir=d; } } }
+        continue; }
+      if(mode==="spend"){
+        const d=Math.hypot(nx[u]-Tx,ny[u]-Ty);
+        if(R-1.04*d-tailMid<runMin){ if(c.trace) c.trace.push("near R"+R.toFixed(1)); mode="approach"; continue; }
+        if(!wp && wpLeft<=0){ wp=pickWaypoint(u,R,Tx,Ty); if(wp) cellR[wp.c]+=wpSpend; }
+        if(wp && Math.hypot(nx[u]-wp.x,ny[u]-wp.y)<dc*0.5){ cellR[wp.c]-=wpSpend; wp=null; wpLeft=wpSpend; }
+        let run=chooseRun(u,inLine,inDir,R,Tx,Ty,self,Infinity,wp); if(!run && !wp) run=chooseRun(u,inLine,inDir,R,Tx,Ty,self,Infinity,null,true); if(!run){ if(wp){ cellR[wp.c]-=wpSpend; wp=null; wpLeft=0; continue; } if(c.trace) c.trace.push("run-null R"+R.toFixed(1)); mode="approach"; continue; }
+        if(!wp) wpLeft-=run.len;
+        applyRun(c,run,self); R-=run.len; u=run.j>=0 ? seqs[run.li][run.j] : u; inLine=run.li; inDir=run.d;
+      } else {
+        let res=approach(u,inLine,inDir,R,Tx,Ty,self,false);
+        if(c.trace) c.trace.push("ap "+(res?res.status+" left"+res.left.toFixed(1):"null")+" R"+R.toFixed(1)+" at "+nx[u].toFixed(2)+","+ny[u].toFixed(2));
+        if(res && res.status==="short"){ const r2=approach(u,inLine,inDir,R,Tx,Ty,self,true); if(r2 && (r2.status!=="short" || r2.left>res.left)) res=r2; }
+        if(res && res.status==="long" && extra++<60){ const cap=res.left-tailMid; let run=chooseRun(u,inLine,inDir,R,Tx,Ty,self,Math.max(0.05,cap)); if(!run) run=chooseRun(u,inLine,inDir,R,Tx,Ty,self,Math.max(0.05,cap),null,true);
+          if(run){ applyRun(c,run,self); R-=run.len; u=seqs[run.li][run.j]; inLine=run.li; inDir=run.d; continue; } }
+        if(wp){ cellR[wp.c]-=wpSpend; wp=null; }
+        if(res && res.status==="long" && c.trace) c.trace.push("longrun-null extra"+extra);
+        if(!res){ c.tie=u; c.tail=Math.max(0,R); break; }
+        applyPath(c,res,u,self);
+        R=res.left; c.tie=res.tie;
+        if(R<tailMin){ c.over=tailMin-R; R=tailMin; }
+        if(R>tailMax) c.longTail=R-tailMax;
+        c.tail=R; break;
+      }
+    }
+    let len=c.stub; for(const e of c.edges) len+=elen[e]; c.len=len+c.tail;
+    let turns=0; for(let q=1;q<c.edges.length;q++) if(eline[c.edges[q]]!==eline[c.edges[q-1]]) turns++; c.turns=turns;
+  }
+  const ripUp=(c)=>{ for(const e of c.edges) addLoad(e,-1); c.edges=[]; c.nodes=[]; };
+
+  /* first pass: all cables in random order */
+  const perm=cab.map((c,i)=>i); for(let i=perm.length-1;i>0;i--){ const j=Math.floor(rng()*(i+1)); [perm[i],perm[j]]=[perm[j],perm[i]]; }
+  for(let q=0;q<perm.length;q++){ route(cab[perm[q]]); if(q%40===39) yield {phase:"routing", done:q+1, total:N}; }
+  /* balancing passes */
+  for(let pass=1; pass<=p.passes; pass++){
+    covBonus=2+pass*1.5;
+    const gcell=0.35, gw=Math.ceil(net.W/gcell)+1, gh=Math.ceil(net.H/gcell)+1, cg=Array.from({length:gw*gh},()=>new Set());
+    for(const c of cab) for(const k of c.nodes) cg[Math.floor(ny[k]/gcell)*gw+Math.floor(nx[k]/gcell)].add(c.id);
+    const pick=new Set();
+    for(let e=0;e<nE;e++){ if(load[e]>0) continue; const xm=(nx[ea[e]]+nx[eb[e]])/2, ym=(ny[ea[e]]+ny[eb[e]])/2, gx=Math.floor(xm/gcell), gy=Math.floor(ym/gcell); const near=[];
+      for(let oy=-1;oy<=1;oy++) for(let ox=-1;ox<=1;ox++){ const xx=gx+ox, yy=gy+oy; if(xx<0||yy<0||xx>=gw||yy>=gh) continue; for(const id of cg[yy*gw+xx]) near.push(id); }
+      if(near.length) pick.add(near[Math.floor(rng()*near.length)]); if(pick.size>N*0.35) break; }
+    for(const c of cab) if(rng()<p.rerouteShare) pick.add(c.id);
+    const list=[...pick]; for(let i=list.length-1;i>0;i--){ const j=Math.floor(rng()*(i+1)); [list[i],list[j]]=[list[j],list[i]]; }
+    for(let q=0;q<list.length;q++){ const c=cab[list[q]]; ripUp(c); route(c); if(q%40===39) yield {phase:"balancing pass "+pass, done:q+1, total:list.length}; }
+  }
+  /* coverage repair: every still-empty segment gets the nearby cable that loses least by being re-routed through it */
+  let repairs=0;
+  for(let round=0; round<p.repairRounds; round++){
+    const unc=[]; for(let e=0;e<nE;e++) if(load[e]===0) unc.push(e); if(!unc.length) break;
+    covBonus=8;
+    const gcell=0.35, gw=Math.ceil(net.W/gcell)+1, gh=Math.ceil(net.H/gcell)+1, cg=Array.from({length:gw*gh},()=>new Set());
+    for(const c of cab) for(const k of c.nodes) cg[Math.floor(ny[k]/gcell)*gw+Math.floor(nx[k]/gcell)].add(c.id);
+    const budget=unc.length*4+100;
+    for(let q=0;q<unc.length && q<budget;q++){ const e=unc[q]; if(load[e]>0) continue;
+      const xm=(nx[ea[e]]+nx[eb[e]])/2, ym=(ny[ea[e]]+ny[eb[e]])/2, gx=Math.floor(xm/gcell), gy=Math.floor(ym/gcell), near=new Set();
+      for(let r=1; r<=3 && near.size<4; r++) for(let oy=-r;oy<=r;oy++) for(let ox=-r;ox<=r;ox++){ const xx=gx+ox, yy=gy+oy; if(xx<0||yy<0||xx>=gw||yy>=gh) continue; for(const id of cg[yy*gw+xx]) near.add(id); }
+      for(let r=4; r<=6 && near.size<14; r++) for(let oy=-r;oy<=r;oy++) for(let ox=-r;ox<=r;ox++){ if(Math.max(Math.abs(ox),Math.abs(oy))<r) continue; const xx=gx+ox, yy=gy+oy; if(xx<0||yy<0||xx>=gw||yy>=gh) continue; for(const id of cg[yy*gw+xx]) near.add(id); }
+      const ranked=[];
+      for(const id of near){ const c=cab[id]; let sole=0; for(const f of c.edges) if(load[f]===1) sole++; const need=1.04*(Math.hypot(xm-c.bulb[0],ym-c.bulb[1])+ym)+tailMid; if(need>L-c.stub) continue;
+        ranked.push([sole+(c.repaired||0)*3+2*round*rng()+(round>0?3*rng():0), c]); }
+      ranked.sort((a,b)=>a[0]-b[0]);
+      for(let t=0; t<Math.min(4,ranked.length) && load[e]===0; t++){ const best=ranked[t][1];
+        const before=best.edges.filter(f=>load[f]===1), oldEdges=best.edges.slice(), oldNodes=best.nodes.slice(), old={tie:best.tie,tail:best.tail,over:best.over,longTail:best.longTail,turns:best.turns,up:best.up,len:best.len};
+        ripUp(best); best.force=e; route(best); best.force=-1; repairs++; best.repaired=(best.repaired||0)+1;
+        if(load[e]===0){ ripUp(best); best.edges=oldEdges; best.nodes=oldNodes; Object.assign(best,old); for(const f of oldEdges) addLoad(f,1); continue; }
+        for(const f of before) if(load[f]===0) unc.push(f); }
+      if(q%20===19) yield {phase:"coverage repair "+(round+1), done:q+1, total:unc.length}; } }
+  return {cab, load, target, meanStub, repairs};
+}
+
+function netStats(p, net, res){
+  const {cab, load, target}=res, {nE,elen,ny,ea,eb}=net, N=cab.length;
+  let uncov=0, uncovLen=0, lmin=Infinity, lmax=0, sumLL=0, sumL2=0; const hist=new Int32Array(31); const bandCab=new Float64Array(net.bands);
+  let coverA=0; for(let e=0;e<nE;e++) coverA+=elen[e]*bundleW(load[e]);
+  for(let e=0;e<nE;e++){ const ld=load[e]; if(ld===0){ uncov++; uncovLen+=elen[e]; } lmin=Math.min(lmin,ld); lmax=Math.max(lmax,ld); sumLL+=ld*elen[e]; sumL2+=ld*ld*elen[e]; hist[Math.min(30,ld)]++;
+    bandCab[Math.min(net.bands-1,Math.floor((ny[ea[e]]+ny[eb[e]])/2/0.5))]+=ld*elen[e]; }
+  const mean=sumLL/net.netLen, sd=Math.sqrt(Math.max(0,sumL2/net.netLen-mean*mean));
+  const band=Array.from(bandCab,(v,i)=> net.bandLen[i]>0 ? v/net.bandLen[i] : 0);
+  let tails=0, tmin=Infinity, tmax=0, over=0, overSum=0, longT=0, longSum=0, turns=0, tmaxTurns=0, up=0, lenSum=0, disp=0;
+  for(const c of cab){ tails+=c.tail; tmin=Math.min(tmin,c.tail); tmax=Math.max(tmax,c.tail); if(c.over>0){ over++; overSum+=c.over; } if(c.longTail>0){ longT++; longSum+=c.longTail; }
+    turns+=c.turns; tmaxTurns=Math.max(tmaxTurns,c.turns); up+=c.up; lenSum+=c.len; disp+=Math.hypot(net.nx[c.tie]-c.bulb[0], net.ny[c.tie]+c.tail-c.bulb[1]); }
+  const famL=new Float64Array(net.famDefs.length), famN=new Float64Array(net.famDefs.length); for(let e=0;e<nE;e++){ famL[net.efam[e]]+=load[e]*elen[e]; famN[net.efam[e]]+=elen[e]; }
+  const fam=net.famDefs.map((q,i)=>({name:q.name, mean:famL[i]/Math.max(1e-9,famN[i])}));
+  const bandMin=Math.min(...band), bandMax=Math.max(...band);
+  return {cover:Math.min(1,coverA/(net.W*net.H)), coverFlat:Math.min(9,sumLL*0.0055/(net.W*net.H)), fam, uncov, uncovLen, lmin, lmax, mean, sd, cv:sd/Math.max(1e-9,mean), hist, band, bandMin, bandMax, target, tailMean:tails/N, tmin, tmax, over, overMean:over?overSum/over:0, longT, longMean:longT?longSum/longT:0,
+    turnsMean:turns/N, turnsMax:tmaxTurns, ties:turns+N, upShare:up/Math.max(1e-9,lenSum), lenMean:lenSum/N, dispMean:disp/N, massKg:(lenSum*0.040)+N*0.12};
+}
+/*CORE-END*/
+
+/* ═══════════════════════ UI ═══════════════════════ */
+const $=id=>document.getElementById(id);
+const IDS=["W","H","cells","diagMult","snap","N","L","tailMin","tailMax","topClear","runMin","runMax","passes","seed","bulbSeed"];
+const KEY="net12.params.v1";
+function params(){ const p={}; for(const id of IDS) p[id]=+$(id).value; p.diagonals=$("diagonals").checked; p.rerouteShare=0.12; p.repairRounds=6; return p; }
+function restore(){ try{ const v=JSON.parse(localStorage.getItem(KEY)||"null"); if(!v) return; for(const id of IDS) if(v[id]!=null) $(id).value=v[id]; if(v.diagonals!=null) $("diagonals").checked=v.diagonals; }catch(e){} }
+function persist(){ try{ localStorage.setItem(KEY, JSON.stringify(params())); }catch(e){} }
+
+let NET=null, NETKEY="", BULBS=null, RES=null, ST=null, P=null, running=null;
+let view="cables", zoom=1, panX=0, panY=0, hoverCable=-1, loadGroups=null;
+const cv=$("cv"), ctx=cv.getContext("2d");
+
+function netKey(p){ return [p.W,p.H,p.cells,p.diagMult,p.snap,p.diagonals].join("|"); }
+function generate(){
+  if(running) running.cancel=true;
+  const p=params(); persist(); P=p;
+  const job={cancel:false}; running=job; $("gen").disabled=true;
+  const prog=$("prog"); prog.hidden=false; prog.textContent="building lattice…";
+  setTimeout(()=>{
+    if(job.cancel) return;
+    const k=netKey(p); if(!NET || k!==NETKEY){ NET=buildNet(p); NETKEY=k; }
+    BULBS=placeBulbs(p, NET, mulberry32((p.bulbSeed*9973+17)>>>0));
+    const gen=routeAll(p, NET, BULBS, (p.seed*7919+3)>>>0);
+    const t0=performance.now();
+    const pump=()=>{ if(job.cancel) return; const tEnd=performance.now()+40; let r;
+      do{ r=gen.next(); if(r.done) break; prog.textContent=`${r.value.phase}: ${r.value.done} / ${r.value.total}`; } while(performance.now()<tEnd);
+      if(!r.done){ setTimeout(pump,0); return; }
+      RES=r.value; RES.ms=performance.now()-t0; ST=netStats(p,NET,RES); groupLoads(); prog.hidden=true; running=null; $("gen").disabled=false; drawStats(); draw(); };
+    pump();
+  },20);
+}
+function groupLoads(){ loadGroups=new Map(); for(let e=0;e<NET.nE;e++){ const l=RES.load[e]; if(!loadGroups.has(l)) loadGroups.set(l,[]); loadGroups.get(l).push(e); } }
+
+/* ───────── drawing ───────── */
+function fit(){ const r=cv.getBoundingClientRect(), dpr=Math.min(2,window.devicePixelRatio||1); cv.width=Math.round(r.width*dpr); cv.height=Math.round(r.height*dpr); return dpr; }
+function worldScale(){ if(!NET) return 1; const pad=30*(window.devicePixelRatio||1); return Math.min((cv.width-2*pad)/NET.W,(cv.height-2*pad)/NET.H)*zoom; }
+function toScreen(x,y){ const s=worldScale(); const ox=(cv.width-NET.W*s)/2+panX, oy=(cv.height-NET.H*s)/2+panY; return [ox+x*s, oy+y*s]; }
+function draw(){
+  fit(); ctx.setTransform(1,0,0,1,0,0); ctx.fillStyle="#2a2723"; ctx.fillRect(0,0,cv.width,cv.height);
+  if(!NET) return; const s=worldScale(), ox=(cv.width-NET.W*s)/2+panX, oy=(cv.height-NET.H*s)/2+panY;
+  ctx.fillStyle="#f2ede4"; ctx.fillRect(ox,oy,NET.W*s,NET.H*s);
+  const {nx,ny,ea,eb}=NET; const X=(x)=>ox+x*s, Y=(y)=>oy+y*s;
+  const cAlpha=clamp((+$("cableAlpha").value||100)/100,0.05,1);
+  if(RES && view!=="lattice"){
+    ctx.globalAlpha=cAlpha;
+    const keys=[...loadGroups.keys()].sort((a,b)=>a-b);
+    for(const l of keys){ if(l===0) continue; const arr=loadGroups.get(l); ctx.beginPath();
+      for(const e of arr){ ctx.moveTo(X(nx[ea[e]]),Y(ny[ea[e]])); ctx.lineTo(X(nx[eb[e]]),Y(ny[eb[e]])); }
+      if(view==="heat"){ const r=l/RES.target; ctx.strokeStyle = r<0.5 ? "#e0714a" : r<0.85 ? "#d8a24a" : r<=1.2 ? "#2f6f5f" : r<=1.6 ? "#3f6fb0" : "#5b3fb0"; ctx.lineWidth=Math.max(1.2,0.012*s); }
+      else { ctx.strokeStyle="#0d0b09"; ctx.lineWidth=Math.max(0.5, bundleW(l)*s); }
+      ctx.stroke(); }
+    ctx.globalAlpha=1;
+    if($("showUncov").checked && loadGroups.has(0)){ ctx.beginPath(); for(const e of loadGroups.get(0)){ ctx.moveTo(X(nx[ea[e]]),Y(ny[ea[e]])); ctx.lineTo(X(nx[eb[e]]),Y(ny[eb[e]])); }
+      ctx.strokeStyle="#ff2a2a"; ctx.lineWidth=Math.max(2,0.01*s); ctx.stroke(); }
+  }
+  if($("showLattice").checked || view==="lattice"){ ctx.beginPath(); for(const Ln of NET.lines){ ctx.moveTo(X(Ln.x0),Y(Ln.y0)); ctx.lineTo(X(Ln.x1),Y(Ln.y1)); }
+    ctx.strokeStyle = view==="lattice" ? "rgba(26,95,214,.9)" : "rgba(26,95,214,.45)"; ctx.lineWidth=1; ctx.stroke(); }
+  if(RES && $("showBulbs").checked && view!=="lattice"){
+    ctx.globalAlpha=cAlpha; ctx.beginPath(); for(const c of RES.cab){ const tx=nx[c.tie], ty=ny[c.tie]; ctx.moveTo(X(tx),Y(ty)); ctx.lineTo(X(tx),Y(ty+c.tail)); } ctx.strokeStyle="rgba(13,11,9,.7)"; ctx.lineWidth=Math.max(0.5,0.0055*s); ctx.stroke(); ctx.globalAlpha=1;
+    const r=Math.max(1.4,0.028*s); ctx.fillStyle="#c8892a"; ctx.beginPath(); for(const c of RES.cab){ const bx=X(nx[c.tie]), by=Y(ny[c.tie]+c.tail); ctx.moveTo(bx+r,by); ctx.arc(bx,by,r,0,6.2832); } ctx.fill(); }
+  if(RES && hoverCable>=0){ const c=RES.cab[hoverCable]; ctx.globalAlpha=1;
+    ctx.beginPath(); ctx.moveTo(X(c.anchorX),Y(0)); ctx.lineTo(X(nx[c.nodes[0]]),Y(0)); for(const k of c.nodes) ctx.lineTo(X(nx[k]),Y(ny[k])); ctx.lineTo(X(nx[c.tie]),Y(ny[c.tie]+c.tail));
+    ctx.strokeStyle="#e8322a"; ctx.lineWidth=Math.max(2.5,0.01*s); ctx.lineJoin="round"; ctx.stroke();
+    ctx.fillStyle="#fff"; ctx.strokeStyle="#0d0b09"; ctx.lineWidth=1; const tr=Math.max(2.5,0.012*s);
+    for(let q=1;q<c.edges.length;q++) if(NET.eline[c.edges[q]]!==NET.eline[c.edges[q-1]]){ const k=c.nodes[q]; ctx.beginPath(); ctx.arc(X(nx[k]),Y(ny[k]),tr,0,6.2832); ctx.fill(); ctx.stroke(); }
+    ctx.fillStyle="#e8322a"; ctx.beginPath(); ctx.arc(X(c.anchorX),Y(0),tr*1.6,0,6.2832); ctx.fill();
+    ctx.beginPath(); ctx.arc(X(nx[c.tie]),Y(ny[c.tie]+c.tail),tr*2,0,6.2832); ctx.stroke(); }
+}
+function row(k,v,cls){ return `<div class="stat ${cls||""}"><span>${k}</span><b>${v}</b></div>`; }
+const f=(v,d=1)=> (+v).toFixed(d);
+function drawStats(){
+  const n=NET, s=ST, p=P;
+  const lEven = n.netLen*Math.max(1,p.N/n.topCut)/p.N + (p.tailMin+p.tailMax)/200;
+  $("stLat").innerHTML = row("families", n.famDefs.map(q=>q.name).join(" · "))+row("rows × columns", `${n.rows} × ${n.cols} · spacing ${f(n.sx*100,1)} cm`)+
+    row("lines", n.lines.length)+row("crossings → nodes", `${n.crossings} → ${n.nN} (${n.merged} merged)`)+row("segments", `${n.nE} · mean ${f(n.netLen/n.nE*100,1)} cm`)+
+    row("net length", f(n.netLen,0)+" m")+row("segments leaving the beam band", n.topCut)+row("build", n.ms+" ms");
+  const lenCls = Math.abs(p.L-lEven)<0.6 ? "good" : p.L<lEven ? "bad" : "hi";
+  $("stCab").innerHTML = row("cables × length", `${p.N} × ${f(p.L,1)} m = ${f(p.N*p.L/1000,2)} km`)+
+    row("length for even density", `≥ ${f(lEven,1)} m`, lenCls)+
+    row("mass (40 g/m + 120 g bulb)", f(s.massKg,0)+" kg")+
+    row("tails  min / mean / max", `${f(s.tmin*100,0)} / ${f(s.tailMean*100,0)} / ${f(s.tmax*100,0)} cm`)+
+    row("cables longer than planned", s.over? `${s.over} · by ${f(s.overMean*100,0)} cm` : "0", s.over?"bad":"good")+
+    row("tails longer than max", s.longT? `${s.longT} · by ${f(s.longMean*100,0)} cm` : "0", s.longT>p.N*0.05?"bad":s.longT?"hi":"good")+
+    row("zip ties at turns  per cable mean / max", `${f(s.turnsMean,1)} / ${s.turnsMax}`)+
+    row("zip ties total (turns + bulb ties)", s.ties.toLocaleString())+
+    row("length travelled upward", f(s.upShare*100,0)+" %")+
+    row("bulb moved from its random spot", f(s.dispMean*100,1)+" cm mean")+
+    row("routing", f(RES.ms/1000,1)+" s");
+  $("stDen").innerHTML = row("wall covered by cable, zip-tied bundles ≈", f(s.cover*100,0)+" %", s.cover<0.6?"good":s.cover<0.8?"hi":"bad")+
+    row("… if cables lay side by side ≈", f(Math.min(1,s.coverFlat)*100,0)+" %")+row("uncovered segments", s.uncov+(s.uncov?` · ${f(s.uncovLen,2)} m`:""), s.uncov?"bad":"good")+
+    row("target cables per segment", f(s.target,2))+row("cables per segment  min / mean / max", `${s.lmin} / ${f(s.mean,2)} / ${s.lmax}`)+
+    row("spread (CV, length-weighted)", f(s.cv*100,0)+" %", s.cv<0.35?"good":s.cv<0.6?"hi":"bad")+
+    row("by direction", s.fam.map(q=>q.name+" "+f(q.mean,1)).join(" · "))+
+    row("by height  thinnest / thickest band", `${f(s.bandMin,2)} / ${f(s.bandMax,2)}`, s.bandMin/s.bandMax>0.75?"good":"hi");
+  chartBand(); chartHist();
+}
+function chartBand(){ const c=$("chBand"), g=c.getContext("2d"); const dpr=window.devicePixelRatio||1; c.width=c.clientWidth*dpr; c.height=c.clientHeight*dpr; g.scale(dpr,dpr);
+  const w=c.clientWidth, h=c.clientHeight, b=ST.band, mx=Math.max(ST.target*1.6,...b); g.fillStyle="#141210"; g.fillRect(0,0,w,h);
+  const bh=(h-16)/b.length; g.strokeStyle="rgba(127,179,163,.8)"; g.setLineDash([3,3]); g.beginPath(); const tx=28+(w-36)*ST.target/mx; g.moveTo(tx,4); g.lineTo(tx,h-12); g.stroke(); g.setLineDash([]);
+  b.forEach((v,i)=>{ g.fillStyle="#d8a24a"; g.fillRect(28,4+i*bh,(w-36)*v/mx,Math.max(1,bh-1)); });
+  g.fillStyle="#9a9186"; g.font="9px ui-monospace,monospace"; g.fillText("0 m",2,10); g.fillText(f(NET.H,0)+" m",2,h-14); g.fillText("target "+f(ST.target,1),tx+3,h-3); }
+function chartHist(){ const c=$("chHist"), g=c.getContext("2d"); const dpr=window.devicePixelRatio||1; c.width=c.clientWidth*dpr; c.height=c.clientHeight*dpr; g.scale(dpr,dpr);
+  const w=c.clientWidth, h=c.clientHeight, H=ST.hist, mx=Math.max(...H); g.fillStyle="#141210"; g.fillRect(0,0,w,h); const bw=(w-8)/H.length;
+  H.forEach((v,i)=>{ g.fillStyle = i===0 ? "#e0714a" : "#7fb3a3"; const bh=(h-16)*v/mx; g.fillRect(4+i*bw,h-12-bh,Math.max(1,bw-1),bh); });
+  g.fillStyle="#9a9186"; g.font="9px ui-monospace,monospace"; g.fillText("0",4,h-2); g.fillText("10",4+10*bw,h-2); g.fillText("20",4+20*bw,h-2); g.fillText("30+",w-20,h-2); }
+
+/* ───────── interaction ───────── */
+let drag=null;
+cv.addEventListener("wheel",e=>{ e.preventDefault(); if(!NET) return; const dpr=window.devicePixelRatio||1, mx=e.offsetX*dpr, my=e.offsetY*dpr, s0=worldScale(); const ox=(cv.width-NET.W*s0)/2+panX, oy=(cv.height-NET.H*s0)/2+panY;
+  const wx=(mx-ox)/s0, wy=(my-oy)/s0; zoom=clamp(zoom*Math.exp(-e.deltaY*0.0015),0.5,40); const s1=worldScale(); panX=mx-wx*s1-(cv.width-NET.W*s1)/2; panY=my-wy*s1-(cv.height-NET.H*s1)/2; draw(); },{passive:false});
+cv.addEventListener("pointerdown",e=>{ drag={x:e.clientX,y:e.clientY,px:panX,py:panY}; cv.setPointerCapture(e.pointerId); cv.style.cursor="grabbing"; });
+cv.addEventListener("pointerup",()=>{ drag=null; cv.style.cursor="grab"; });
+cv.addEventListener("dblclick",()=>{ zoom=1; panX=0; panY=0; draw(); });
+cv.addEventListener("pointermove",e=>{ const dpr=window.devicePixelRatio||1;
+  if(drag){ panX=drag.px+(e.clientX-drag.x)*dpr; panY=drag.py+(e.clientY-drag.y)*dpr; draw(); return; }
+  if(!RES) return; const mx=e.offsetX*dpr, my=e.offsetY*dpr; let best=-1, bd=(14*dpr)**2;
+  for(const c of RES.cab){ const [sx,sy]=toScreen(NET.nx[c.tie],NET.ny[c.tie]+c.tail); const d=(sx-mx)**2+(sy-my)**2; if(d<bd){ bd=d; best=c.id; } }
+  if(best!==hoverCable){ hoverCable=best; draw(); }
+  const s=worldScale(), ox=(cv.width-NET.W*s)/2+panX, oy=(cv.height-NET.H*s)/2+panY, wx=(mx-ox)/s, wy=(my-oy)/s;
+  let txt=`x ${f(wx,2)} m  y ${f(wy,2)} m`;
+  if(best>=0){ const c=RES.cab[best]; txt+=`\ncable ${c.id}: ${f(c.len,2)} m · beam ${f(c.anchorX,3)} m → bulb ${f(NET.nx[c.tie],2)}, ${f(NET.ny[c.tie]+c.tail,2)} m\n${c.turns} zip ties at turns · tail ${f(c.tail*100,0)} cm · ${f(100*c.up/Math.max(1e-9,c.len),0)} % upward`; }
+  $("hud").textContent=txt; });
+document.querySelectorAll("#viewSeg button").forEach(b=>b.onclick=()=>{ view=b.dataset.v; document.querySelectorAll("#viewSeg button").forEach(x=>x.classList.toggle("on",x===b)); draw(); });
+for(const id of ["showLattice","showBulbs","showUncov"]) $(id).onchange=draw;
+$("cableAlpha").oninput=()=>{ $("cableAlphaVal").textContent=$("cableAlpha").value+" %"; try{ localStorage.setItem("net12.cableAlpha",$("cableAlpha").value); }catch(e){} draw(); };
+try{ const a=localStorage.getItem("net12.cableAlpha"); if(a){ $("cableAlpha").value=a; $("cableAlphaVal").textContent=a+" %"; } }catch(e){}
+$("gen").onclick=generate;
+$("newBulbs").onclick=()=>{ $("bulbSeed").value=Math.floor(Math.random()*1e6); generate(); };
+$("newSeed").onclick=()=>{ $("seed").value=Math.floor(Math.random()*1e6); generate(); };
+$("suggestL").onclick=()=>{ const p=params(); const k=netKey(p); if(!NET||k!==NETKEY){ NET=buildNet(p); NETKEY=k; }
+  const lEven=NET.netLen*Math.max(1,p.N/NET.topCut)/p.N+(p.tailMin+p.tailMax)/200; $("L").value=(Math.ceil(lEven*2)/2).toFixed(1); generate(); };
+window.addEventListener("resize",()=>{ draw(); if(ST) drawStats(); });
+
+/* ───────── export ───────── */
+function dl(name,data,type){ const b=data instanceof Blob?data:new Blob([data],{type}); const u=URL.createObjectURL(b), a=document.createElement("a"); a.href=u; a.download=name; document.body.appendChild(a); a.click(); setTimeout(()=>{ URL.revokeObjectURL(u); a.remove(); },500); }
+const stamp=()=>`net12_${P.cells}x${P.cells}_L${P.L}_s${P.seed}_b${P.bulbSeed}`;
+$("exSvg").onclick=()=>{ if(!RES) return; const {nx,ny,ea,eb}=NET, mm=1000, o=[];
+  o.push(`<svg xmlns="http://www.w3.org/2000/svg" width="${NET.W*mm}mm" height="${NET.H*mm}mm" viewBox="0 0 ${NET.W*mm} ${NET.H*mm}">`);
+  o.push(`<metadata>${JSON.stringify({params:P, stats:{uncovered:ST.uncov, meanPerSegment:+ST.mean.toFixed(3), cv:+ST.cv.toFixed(3), ties:ST.ties}})}</metadata>`);
+  o.push(`<rect width="${NET.W*mm}" height="${NET.H*mm}" fill="#f2ede4"/>`);
+  o.push(`<g id="lattice" stroke="#1a5fd6" stroke-opacity=".45" stroke-width="1" fill="none">`); for(const Ln of NET.lines) o.push(`<line x1="${(Ln.x0*mm).toFixed(1)}" y1="${(Ln.y0*mm).toFixed(1)}" x2="${(Ln.x1*mm).toFixed(1)}" y2="${(Ln.y1*mm).toFixed(1)}"/>`); o.push(`</g>`);
+  o.push(`<g id="cables" stroke="#0d0b09" stroke-linecap="round" fill="none">`);
+  for(const [l,arr] of [...loadGroups].sort((a,b)=>a[0]-b[0])){ if(l===0) continue; let d=""; for(const e of arr) d+=`M${(nx[ea[e]]*mm).toFixed(1)} ${(ny[ea[e]]*mm).toFixed(1)}L${(nx[eb[e]]*mm).toFixed(1)} ${(ny[eb[e]]*mm).toFixed(1)}`; o.push(`<path data-cables="${l}" stroke-width="${(bundleW(l)*1000).toFixed(1)}" d="${d}"/>`); }
+  o.push(`</g><g id="bulbs">`); for(const c of RES.cab){ const x=nx[c.tie]*mm, y=ny[c.tie]*mm; o.push(`<line x1="${x.toFixed(1)}" y1="${y.toFixed(1)}" x2="${x.toFixed(1)}" y2="${(y+c.tail*mm).toFixed(1)}" stroke="#0d0b09" stroke-width="5.5"/><circle cx="${x.toFixed(1)}" cy="${(y+c.tail*mm).toFixed(1)}" r="30" fill="#c8892a"/>`); }
+  o.push(`</g></svg>`); dl(stamp()+".svg",o.join("\n"),"image/svg+xml"); };
+$("exPng").onclick=()=>{ cv.toBlob(b=>dl(stamp()+".png",b,"image/png")); };
+$("exJson").onclick=()=>{ if(!RES) return; const {nx,ny}=NET; const out={params:P, net:{nodes:NET.nN, segments:NET.nE, netLength_m:+NET.netLen.toFixed(2)},
+  cables:RES.cab.map(c=>({id:c.id, beam_x_m:+c.anchorX.toFixed(4), length_m:+c.len.toFixed(3), tail_m:+c.tail.toFixed(3), bulb:[+nx[c.tie].toFixed(4), +(ny[c.tie]+c.tail).toFixed(4)], zipTiesAtTurns:c.turns,
+    path_m:[[+c.anchorX.toFixed(4),0], ...c.nodes.map(k=>[+nx[k].toFixed(4), +ny[k].toFixed(4)])]}))};
+  dl(stamp()+"_cables.json",JSON.stringify(out),"application/json"); };
+$("exCsv").onclick=()=>{ if(!RES) return; const {nx,ny}=NET; const L=["cable_id,beam_x_mm,length_mm,tail_mm,bulb_x_mm,bulb_y_mm,zip_ties_at_turns,upward_mm,path_points"];
+  for(const c of RES.cab) L.push([c.id,Math.round(c.anchorX*1000),Math.round(c.len*1000),Math.round(c.tail*1000),Math.round(nx[c.tie]*1000),Math.round((ny[c.tie]+c.tail)*1000),c.turns,Math.round(c.up*1000),c.nodes.length].join(","));
+  dl(stamp()+"_cables.csv",L.join("\n"),"text/csv"); };
+$("exTies").onclick=()=>{ if(!RES) return; const {nx,ny,eline}=NET; const L=["cable_id,tie_no,x_mm,y_mm,kind"];
+  for(const c of RES.cab){ let n=0; for(let q=1;q<c.edges.length;q++) if(eline[c.edges[q]]!==eline[c.edges[q-1]]){ const k=c.nodes[q]; L.push([c.id,++n,Math.round(nx[k]*1000),Math.round(ny[k]*1000),"turn"].join(",")); }
+    L.push([c.id,++n,Math.round(nx[c.tie]*1000),Math.round(ny[c.tie]*1000),"bulb"].join(",")); }
+  dl(stamp()+"_ties.csv",L.join("\n"),"text/csv"); };
+
+restore(); draw(); generate();
+</script>
+</body>
+</html>

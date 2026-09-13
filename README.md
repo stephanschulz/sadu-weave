@@ -265,6 +265,35 @@ the model that draws a hand-drawn design faithfully: the carrier stays a
 single cable, the design lines are the routed cables, thickness is how many
 cables trace a path.
 
+**12-fold star net — the cables are the net, all the same length.** Stephan
+identified the reference pattern as six families of equally spaced straight
+lines at 30° steps (horizontal, vertical, ±30°, ±60°): the H/V grid is one
+square lattice, the obliques two triangular ones, and because √3 is
+irrational the superposition never repeats — every square is cut differently
+— while 12-ray nodes and 12-pointed rosettes appear where the families
+coincide (`pattern_12fold.png`). Layout *12-fold star net*: the lines
+through the wall's centre at `line spacing` are cut into segments at their
+crossings (40 cm: 126 lines, 2405 crossings, 5008 segments, 728 m of net).
+**Every cable has the same length** (`cable length`): it starts at a beam
+crossing near its bulb (± `anchor jitter`), and its bulb is one of 1000
+evenly spread (blue-noise) targets tied to the nearest crossing above. At
+every crossing it chooses the next segment: while it has more length than
+the exact shortest allowed route to its tie needs (a reverse Dijkstra over
+downward-or-level moves, dead ends excluded), it *wanders* — horizontals
+first, then the 60° lines, on little-used segments, never up, never onto the
+tie's own row, never doubling back on a line; once the spare would fit a
+tail it *finishes* along a shortest route. Result on 9 m / 40 cm: every
+segment carries ~11 cables on average, ~1000 of 5008 carry none, all 1000
+cables arrive or stop where their length ends (12 % stop 1–2 m short, the
+bulb hanging there), and the net is homogeneous top to bottom with bulbs at
+every height (`star_net.png`). The honest limit: a bulb high on the wall
+cannot use 9 m of cable above it — there is not enough net above a shallow
+tie to wind through — so with *exact length* on, that spare hangs as a long
+tail (bulb lower than planned; ~40 % of cables on 9 m, ~35 % on 7 m); with
+it off the tails are capped and the spare is only reported. Shorter cables
+and a finer net reduce it; equal length and evenly spread bulbs pull against
+each other in the top metre of the wall.
+
 **Lattice editor (`lattice-editor.html`).** A second, small app for drawing a
 design by hand on the carrier lattice: pick the carrier (±θ diamonds, verticals
 + one diagonal, verticals + both diagonals), angle, pitch and wall size; the
@@ -514,3 +543,18 @@ part.
 | `design.json` | parameters + summary — reproduce exactly |
 
 Keyboard: `r` new seed · `s` save favourite · `p` polarity · `g` grid · `1`–`3` views (Weave · Bulbs · Technical).
+
+## net12.html — standalone 12-fold cable net (no dependencies)
+
+A fresh single-file app, independent of `sadu-weave.html`.
+
+- **Base lattice.** 52 rows × 52 columns (13.5 cm) on a 7 × 7 m wall plus four diagonal families at ±30° and ±60° through the wall centre. Crossings closer than 1.5 cm merge into one tie point. About 15 600 nodes, 35 600 segments, 2 145 m of lattice line.
+- **Bulbs.** 1000 random positions with a minimum-distance spread (best of 12 candidates). Beam anchors are 7 mm apart; anchor rank in x matches bulb rank in x.
+- **Routing.** All cables have the same length. Cables travel only along lattice lines, in any direction, including upward, and never U-turn in place. They move in runs of 25–90 cm, and each change of line is a zip tie. A coarse 0.5 m density map sends each cable to reachable cells that are below target. The cable spends length there, then a bounded lattice search finds a tie point near its bulb that leaves a 5–30 cm tail.
+- **Balancing and repair.** Balancing passes reroute cables near empty segments plus a random 12 %. A repair step then reroutes, through each still-empty segment, the nearby cable that has the fewest segments of its own to lose.
+- **Stats.** Uncovered segments, cables per segment (min/mean/max, spread), per-direction load, per-0.5 m-band load chart, tails, zip ties, upward share, mass.
+- **Export.** SVG with the lattice in blue, cables drawn thicker with load, and bulbs. Also a cables JSON with node paths, a cables CSV, and a ties CSV listing every turn tie and bulb tie per cable.
+- **Result at the defaults (12 m cables, 3 bulb/routing seeds).** No segment is uncovered and no tail is longer than 30 cm. Cables per segment average 5.5 with about 38 % spread. Bands from the beam down to 6.5 m hold 5.7–6.0 cables per segment. The bottom 0.5 m thins to about 3.3, because no bulb may hang there and cables must climb back out. Vertical lines carry about 7 cables and horizontal lines about 4. Each cable has about 36 zip ties at turns. Routing takes about 27 s.
+- **Routing knobs in code** (`routeAll`): pull 0.9 toward waypoints, gain weight 0.6, local spend 3.5 m per waypoint, direction balance 0.5, floor pull 1.2, 6 repair rounds. In a corner dead end a cable may turn back on its own line.
+- **Why cables must be about 12 m long.** Every cable passes through the lattice segments just under the beam, 195 of them at 52 columns, so the top averages about 5 cables per segment. Even density means every segment carries about the same, so each cable needs roughly the net length divided by that top-row count. That is about 11–12 m, whatever the spacing, because a coarser net shrinks both numbers together. Checked: 52 columns 12 m, 26 columns 12 m, 52 columns with diagonals ×2 12.5 m.
+- **What that means on the wall.** 12 km of 5.5 mm cable laid flat would be about 130 % of the wall area. As zip-tied round bundles it covers about 58 % at 52 columns, 49 % with sparser diagonals, and 42 % at 26 columns. A coarser lattice gives fewer, thicker bundles and more open space. Shorter cables would keep more open space too, but the top of the wall would then be denser than the bottom. `net12_compare.png` shows the three options, full wall on top and centre crops below.
