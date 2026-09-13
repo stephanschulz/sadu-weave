@@ -128,6 +128,8 @@
     </div>
     <p class="note" id="randNote"></p>
     <label class="row"><span>seed</span><input type="number" id="seed" style="flex:0 0 110px"></label>
+    <label class="row"><span>lattice angle</span><input type="range" id="latAngle" min="15" max="75" step="1"><b class="val" id="latAngleVal" style="flex:0 0 130px"></b></label>
+    <p class="note" style="margin-top:0">Angle from vertical of every lattice design (rows follow: cells/row × pitch ÷ tan θ).</p>
 
     <h2>Favourites <span id="favCount" style="float:right;text-transform:none;letter-spacing:0;color:var(--accent)"></span></h2>
     <div class="btnrow"><button id="btnFav" class="primary">★ Save this one</button></div>
@@ -163,6 +165,11 @@
       per pick. At each tie row the strands of a band gather into that row's dark cells. The warping is the program.</p>
     <label class="row"><span>orient on a grid</span><input type="checkbox" id="grid" style="flex:0 0 auto"></label>
     <label class="row"><span>grid pitch</span><input type="range" id="gridPitch" min="0.05" max="0.3" step="0.005"><b class="val"></b></label>
+    <label class="row"><span>row pitch (0 = square)</span><input type="range" id="gridRowPitch" min="0" max="0.3" step="0.001"><b class="val"></b></label>
+    <label class="row"><span>diagonal moves</span><input type="checkbox" id="diagonal" style="flex:0 0 auto"></label>
+    <p class="note">With <i>diagonal moves</i> a strand that changes column is built as a straight cable between the
+      two tie nodes instead of down-then-along-the-row. One cell per row on a square grid is 45°; a 173 mm row
+      pitch makes one cell per row exactly 30° from vertical; 115 mm rows with two cells per row make 60°.</p>
     <label class="row"><span>max run per row</span><input type="range" id="maxStep" min="1" max="6" step="1"><b class="val"></b></label>
     <label class="row"><span>lane offset</span><input type="range" id="laneOff" min="0" max="0.05" step="0.0025"><b class="val"></b></label>
     <p class="note">lane offset lifts rightward runs above and leftward runs below the row line so they don't draw on top
@@ -218,7 +225,90 @@
 
     <h2>Layout</h2>
     <label class="row"><span>composition</span>
-      <select id="layout" style="flex:0 0 190px"><option value="tile">tile one motif across the wall</option><option value="sadu">sadu strip — borders + centre, mirrored</option></select></label>
+      <select id="layout" style="flex:0 0 190px"><option value="tile">tile one motif across the wall</option><option value="lattice">diagonal lattice — two families crossing</option><option value="sadu">sadu strip — borders + centre, mirrored</option></select></label>
+    <div id="latticeBox" class="band">
+      <div class="grid">
+        <label class="full">carrier <select id="latKind"><option value="xx">two diagonal families (±θ, reflecting at the rails)</option><option value="vd">verticals + one diagonal family (diagonals end at the right rail, enter from the left rail)</option></select></label>
+        <label>rail share<input type="number" id="railShare" min="0" max="0.6" step="0.05"></label>
+        <label class="full" style="font-size:9.5px;color:var(--dim)">V+D: the share of cables that start at the top-left corner and run down the left rail, feeding the diagonals that enter from it</label>
+        <label>start every<input type="number" id="latSpacing" min="1" max="6" step="1"></label>
+        <label class="full" style="font-size:9.5px;color:var(--dim)">flow needs an even <i>start every</i> (2 = 20 cm, 4 = 40 cm mesh): with an odd pitch the two families cross between rows, not at nodes</label>
+        <label>cells / row<input type="number" id="latStep" min="1" max="2" step="1"></label>
+        <label class="full">pattern moves <select id="patMoves"><option value="diag">diagonal only</option><option value="diagV">diagonal + vertical</option><option value="diagH">diagonal + horizontal</option><option value="all">diagonal + vertical + horizontal</option></select></label>
+        <label class="full">chart frame <select id="latFrame"><option value="edge">outlines on the lattice — edge following (the turned tile look)</option><option value="rotated">the tile turned — its moves become straight off-grid interconnects between nodes</option><option value="upright">rank pickup (old)</option></select></label>
+        <label class="full">motif <select id="latMotif"></select></label>
+        <div class="btnrow"><button id="loadDrawn">load drawn design (lattice-editor JSON/SVG)</button><span id="drawnInfo" style="font:11px var(--mono);color:var(--dim)"></span></div>
+        <input type="file" id="drawnFile" accept=".json,.svg,application/json,image/svg+xml" style="display:none">
+        <label class="full" style="font-size:9.5px;color:var(--dim)">A drawn design replaces the motif for <b>flow</b>: its painted segments are the dark segments. Draw one motif in
+          several colours — each colour a copy — and the repeat is read from the copies' offsets (two shortest independent ones).</label>
+        <label>chart cell = steps<input type="number" id="latCell" min="1" max="6" step="1"></label>
+        <label>gap<input type="number" id="latGap" min="0" max="6" step="1"></label>
+        <label>stagger<input type="number" id="latStagger2" min="0" max="12" step="1"></label>
+        <label>gather reach<input type="number" id="latReach" min="1" max="20" step="1"></label>
+        <label>turn share<input type="number" id="latTurn" min="0" max="1" step="0.1"></label>
+        <label class="full"><input type="checkbox" id="latFree" style="flex:0 0 auto"> free interconnects — the pattern has its own 10 cm cell and ties anywhere it crosses the lattice (or another bundle); the lattice is structure only, so it can be coarse (<i>start every</i> 3–6)</label>
+        <label>pattern cell (steps)<input type="number" id="patSpacing" min="1" max="4" step="1"></label>
+        <label class="full">along-moves <select id="latMove"><option value="straight">straight off-grid interconnect node to node (k=1 vertical, k=2 steep)</option><option value="chevron">chevron on the lattice — down one step, then along the other direction</option></select></label>
+        <label class="full">bundle families <select id="latWarp"><option value="both">both diagonals — the turned tile and its mirror overlaid (whole wall covered)</option><option value="warp">warp-faced — all bundles start along +θ (the turned tile; the lower-left triangle gets only ribs)</option><option value="feed">warp-faced with feeders — half start −θ as straight bold feeders and become warp bundles at the left rail</option></select></label>
+        <label class="full" style="font-size:9.5px;color:var(--dim)">At a vertex (both nodes ahead dark) a bundle turns with this share, else the rank pickup decides — 1 hugs every side (zigzags), 0 keeps long runs.</label>
+        <label class="full" style="font-size:9.5px;color:var(--dim)"><b>Turned tile:</b> the tile layout's own rule run in the lattice frame — chart columns along one lattice
+          direction, rows along the other, band ranks, pickup, stagger, all as in the tile — so <i>eye</i>, <i>cross</i>,
+          <i>zigzag</i>, <i>pebbles</i> come out as the tile design turned by the lattice angle. Tile <i>down</i> is a
+          +θ step; <i>down-then-along</i> one way is a +θ then −θ chevron; the other way (whose literal rotation
+          would run uphill) is not made — the bundle stays on its line and the other family draws those arms; with
+          horizontal moves enabled it hops along the rib line instead. Bundles on the ground columns between motifs
+          never move (the tile's anchor columns). <b>Edge following</b> is for the lattice-frame motifs (eye outline, block, plus): a bundle runs
+          straight while the node ahead is dark and turns at a vertex.</label>
+        <label class="full" style="font-size:9.5px;color:var(--dim)">The angle (from vertical) sets the row pitch: row = cells/row × column pitch ÷ tan θ. Vertical and
+          horizontal moves are for the pattern bundles only — always between two base nodes, along a diamond's own
+          diagonals, so they cross no base cable; the base stays pure ±θ.</label>
+        <label class="full" style="font-size:9.5px;color:var(--dim)">2 cells/row only visits every other column from a start — use <i>start every 1</i> with it</label>
+        <div class="sect">pattern strands on the base lattice</div>
+        <label class="full"><input type="checkbox" id="latFlow" style="flex:0 0 auto"> <b>flow</b> — all cables ride the lattice lines and re-split at every crossing toward the motif above: dark segments get the cables, light ones keep a single cable; thickness thins with depth as cables shed</label>
+        <label>light share<input type="number" id="flowLight" min="0.005" max="0.5" step="0.01"></label>
+        <label class="full">drawn design → cables <select id="routeMode"><option value="flow">flow — re-split at every node (thickness follows the design)</option><option value="one">one cable per design path (pathfinding from the beam)</option><option value="chain">scheduled lengths, routed through several designs (bulbs stay even by height)</option><option value="equal">equal-length cables routed through several designs</option></select></label>
+        <label>cable length m<input type="number" id="cableLen" min="1" max="40" step="0.5"></label>
+        <label class="full" style="font-size:9.5px;color:var(--dim)">Route modes cut every copy of the motif into monotone paths (a closed diamond = two). <i>one</i> brings a cable per path from the beam by the cheapest lattice route (connectors stay thin and spread), round-robin if cables outnumber paths. <i>chain</i> and <i>equal</i> route each cable beam → path → nearest next path below it has length for → … → the rest of its length straight down the plain lattice → bulb; <i>chain</i> takes every cable's length from the bulb schedule (so bulbs stay evenly spread by height), <i>equal</i> gives all the same length — on a ±45° lattice every segment descends alike, so equal lengths end at one depth. Needs the ±θ carrier at start every 2.</label>
+        <label class="full"><input type="checkbox" id="flowSink" style="flex:0 0 auto"> shed at sinks — where a drawn figure ends, its bundle drops to bulbs there (within the row's bulb budget) instead of running the plain lattice on</label>
+        <label>sink budget ×<input type="number" id="sinkBoost" min="1" max="2" step="0.25"></label>
+        <label class="full" style="font-size:9.5px;color:var(--dim)">flow: the share a carrier-only segment takes at a crossing (0.04 = a few cables; higher = softer contrast)</label>
+        <label class="full"><input type="checkbox" id="latPattern" style="flex:0 0 auto"> pattern strands travel along the lattice (the motif above is their chart)</label>
+        <label>base share<input type="number" id="baseFrac" min="0.05" max="0.6" step="0.05"></label>
+        <label>net pretension N<input type="number" id="netPre" min="0" max="600" step="10"></label>
+        <label>base ends below<input type="number" id="baseEnd" min="0.3" max="1" step="0.05"></label>
+        <label class="full" style="font-size:9.5px;color:var(--dim)">A thin base lattice from this share of the cables, every crossing zip-tied, stretched between the
+          rails. The base keeps all its cables down to <i>base ends below</i> (fraction of the height), then thins out
+          like everything else so its bulbs spread over the lower wall instead of lining the floor — where pattern
+          bundles are light and need little support. The rest form thick pattern bundles that move node to node along the lattice edges — gathering and
+          spreading per the chart, as in the tile layout, on the rotated grid. A bundle that turns at a node pulls it
+          sideways; the node's stiffness comes from the tensioned base strands crossing there, and a turn that would
+          shift it more than <i>allowed rib sag</i> is refused (the bundle goes straight instead). Pattern bundles
+          start only on columns where the base has a node (every <i>start every</i>). The figure below then acts on
+          the pattern layer only — holes reflect the bundles while the base runs straight through them.</label>
+        <div class="sect">figure on the net</div>
+        <label class="full">shape <select id="latFigure"></select></label>
+        <label class="full">drawn by <select id="latMode"><option value="holes">holes — pattern bundles reflect off the figure (base runs through)</option><option value="density">density — pattern cables drop early inside</option><option value="mirror">chevrons — pattern bundles zigzag inside</option></select></label>
+        <label class="full">inside sheds ×<input type="number" id="latDensity" min="0.1" max="10" step="0.1"></label>
+        <label>cell = grid cells<input type="number" id="latScale" min="1" max="6" step="1"></label>
+        <label>stagger rows<input type="number" id="latStagger" min="0" max="20" step="1"></label>
+        <label>gap across<input type="number" id="latGapX" min="0" max="8" step="1"></label>
+        <label>gap down<input type="number" id="latGapY" min="0" max="8" step="1"></label>
+      </div>
+      <p class="note" style="margin:4px 0 0"><b>holes</b> are the only figure that reads on an all-diagonal net; the panel
+        shows what they cost (every hole edge is pulled open — fine near the beam, large shifts low on the wall).
+        <b>chevrons</b> flip both families at every node inside the figure so the pulls cancel — balanced, but a strand
+        zigzagging between two columns traces the very diamonds the lattice already draws, so nothing shows.
+        <b>density</b> keeps every diagonal straight and the net uniform: inside the
+        figure cables drop to their bulbs sooner (× factor), so the figure reads as thin lines and bright bulbs
+        against thick lines — up to 14 : 1 in line weight, no extra load anywhere. &lt; 1 inverts it.
+        <b>holes</b> reflect the strands off the figure like off the rails; the panel shows what that costs:
+        every hole edge is pulled open, and low on the wall a light node can shift by hundreds of millimetres.</p>
+      <p class="note" style="margin:4px 0 0">Every cable is a straight diagonal. From each start column (every
+        <i>start every</i> cells) two strands leave the beam, one at +θ and one at −θ, cross the other family at
+        every node and bounce off the edge rails. No ribs, no anchor columns: at every crossing the two families'
+        sideways pulls cancel, so the net holds itself — the rails only take the bounces. θ comes from the grid:
+        one cell per row on a square grid is 45°; row pitch 173 mm → 30°; 115 mm with 2 cells per row → 60°.</p>
+    </div>
     <div id="tileBox" class="band">
       <div class="bhead"><select id="tileMotif"></select></div>
       <div class="grid">
@@ -260,6 +350,15 @@
     <label class="row"><span>blue-noise tries</span><input type="range" id="bnTries" min="1" max="40" step="1"><b class="val"></b></label>
     <label class="row"><span>min bulb gap</span><input type="range" id="minGap" min="0" max="300" step="5"><b class="val"></b></label>
     <label class="row"><span>no bulbs above</span><input type="range" id="topClear" min="0" max="4" step="0.05"><b class="val"></b></label>
+    <label class="row"><span>bulb drift</span><input type="range" id="bulbDrift" min="0" max="1" step="0.05"><b class="val"></b></label>
+    <label class="row"><span>drift reach</span><input type="range" id="bulbReach" min="1" max="4" step="1"><b class="val"></b></label>
+    <div class="btnrow"><button id="btnBulbs" class="primary">⚄ new bulb layout</button></div>
+    <p class="note">A new bulb layout changes only <b>where cables drop and how long they are</b> — the weave (every
+      strand path, every rib) stays identical: the design seed fixes how many cables leave each strand at each
+      row, the bulb seed re-decides which ones, their tail lengths, and their <i>drift</i>: with that probability a
+      dropping cable first runs along the rib up to <i>reach</i> cells and hangs from <b>any point of the rib</b>
+      (a rib is a tensioned horizontal, so the tie can sit anywhere along it) — so bulbs stop lining up under
+      their strands and under the grid columns.</p>
   </div>
 
   <!-- ───────────────────────── CENTRE: view ───────────────────────── -->
@@ -271,14 +370,11 @@
       </div>
       <div class="seg" id="viewSeg">
         <button data-v="weave" class="on">Weave</button>
-        <button data-v="density">Density</button>
         <button data-v="bulbs">Bulbs</button>
         <button data-v="tech">Technical</button>
       </div>
       <button id="btnPolarity">◐ polarity</button>
       <label class="row" style="margin:0"><input type="checkbox" id="showGrid" style="flex:0 0 auto"> <span style="color:var(--dim)">grid</span></label>
-      <label class="row" style="margin:0"><span style="color:var(--dim)">view dist</span>
-        <input type="range" id="blur" min="0" max="30" step="0.5" style="flex:0 0 90px"><b class="val" style="flex:0 0 44px"></b></label>
       <label class="row" style="margin:0"><span style="color:var(--dim)">line gain</span>
         <input type="range" id="gain" min="0.3" max="4" step="0.1" style="flex:0 0 80px"><b class="val" style="flex:0 0 36px"></b></label>
       <div class="spacer"></div>
@@ -416,6 +512,7 @@ const LEX = {
   dealla  :{label:"dealla — ribs",                    rows:["111","111","010","010"]},
   uwairjan:{label:"uwairjan — pebbles",               rows:["1100","1100","0011","0011"]},
   zigzag  :{label:"zigzag",                           rows:["10000","01000","00100","00010","00001","00010","00100","01000"]},
+  zigzag2 :{label:"zigzag — 2 cells per row (steep)", rows:["100000000","001000000","000010000","000000100","000000001","000000100","000010000","001000000"]},
   ein     :{label:"ein — eye",                        rows:["00100","01010","10001","10001","01010","00100"]},
   dhurs   :{label:"dhurs el khail — horse teeth",     rows:["1000","1100","1110","1111","1110","1100"]},
   vees    :{label:"chevron — stacked V",              rows:["10001","01010","00100"]},
@@ -426,6 +523,26 @@ const LEX = {
   teethIn :{label:"teeth — facing pair",              rows:["1001","1101","1111","1101"]},
 };
 const LEX_KEYS=Object.keys(LEX);
+/* charts for the diagonal lattice, drawn in ITS frame: chart columns run along one
+   lattice direction, chart rows along the other, so a square outline here is a
+   diamond on the wall with every edge on the lattice — the tile "eye" turned onto
+   the lattice; a solid block is the diamond; a plus is the cross                */
+const LLEX = {
+  box     :{label:"eye — diamond outline (square in the lattice frame)", rows:["11111","10001","10001","10001","11111"]},
+  box3    :{label:"small eye — 3-step outline",                          rows:["111","101","111"]},
+  bricks  :{label:"bricks — 5×3 rectangles, running bond (use stagger 2, gap 0)", rows:["11111","10001","10001"]},
+  bricks2 :{label:"long bricks — 7×3 (stagger 3, gap 0)",                 rows:["1111111","1000001","1000001"]},
+  cells   :{label:"cells — 4×2 rectangles, stacked (gap 0)",              rows:["1111","1001"]},
+  block   :{label:"diamond — solid block",                               rows:["111","111","111"]},
+  plus    :{label:"cross — plus in the lattice frame (an X on the wall)", rows:["00100","00100","11111","00100","00100"]},
+  zigzag  :{label:"zigzag — staircase (a vertical chevron column)",      rows:["1000","1100","0100","0110","0010","0011","0001","1001"]},
+  checker :{label:"pebbles — checker of 2-step blocks",                  rows:["1100","1100","0011","0011"]},
+  lines   :{label:"lines — one lattice direction",                       rows:["10","10"]},
+  ladder  :{label:"ladder — rungs across the lattice",                   rows:["111","100","100"]},
+  nest    :{label:"nested eyes — outline inside an outline",             rows:["1111111","1000001","1011101","1010101","1011101","1000001","1111111"]},
+};
+const LLEX_KEYS=Object.keys(LLEX);
+const motifOf=(name)=> LLEX[name] || LEX[name] || LEX.ein;
 
 /* ───────── the glyph dictionary: centre band, 9 pairs wide ───────── */
 const GW=9;
@@ -455,11 +572,90 @@ const GLYPH_KEYS=Object.keys(GLYPHS);
 /* ───────── presets ───────── */
 const bd=(motif,dup,gap,phase)=>({motif,dup:dup||1,gap:gap==null?1:gap,phase:phase|0});
 const PRESETS = {
+  /* newest idea first — the first preset is what the app boots into */
+  "Drawn · V+D eye chain (1914)":{ layout:"lattice", tile:{motif:"drawn", dup:1, gap:0, stagger:0}, lat:{figure:"none",mode:"holes",density:4,scale:2,stagger:0,gapX:1,gapY:1}, latSpacing:2, latKind:"vd", railShare:0.3, drawn:{"kind":"vd","pitch":20,"angle":45,"a":[4,-6],"b":[8,8],"segs":[[7,6,9,8],[9,6,9,8],[9,6,11,8],[9,8,9,10],[9,10,11,12],[11,6,11,8],[11,6,13,8],[11,8,11,10],[11,10,11,12],[11,12,11,14],[11,14,13,16],[13,8,13,10],[13,10,13,12],[13,10,15,12],[13,12,13,14],[13,14,13,16],[13,14,15,16],[15,12,15,14],[15,14,15,16],[23,22,25,24],[25,22,25,24],[25,22,27,24],[25,24,25,26],[25,26,27,28],[27,22,27,24],[27,22,29,24],[27,24,27,26],[27,26,27,28],[27,28,27,30],[27,30,29,32],[29,24,29,26],[29,26,29,28],[29,26,31,28],[29,28,29,30],[29,30,29,32],[29,30,31,32],[31,28,31,30],[31,30,31,32]]}, latStep:1, latPattern:false, latFlow:true, routeMode:"chain", cableLen:9, flowLight:0.02, baseFrac:0.05, netPre:200, baseEnd:0.6, latAngle:45, patMoves:"all", latFrame:"rotated", latFree:true, patSpacing:2, latMove:"straight", latWarp:"both", latTurn:0.5, latCell:1, latReach:8, grid:true, gridPitch:0.10, gridRowPitch:0, diagonal:true, maxStep:2, laneOff:0, margin:0, rowScale:1, twine:0, twinePer:4, mirror:true, maxAng:45,
+    weftEvery:0, weftPhase:0, weftFloat:6, weftStep:3, weftJitter:0, weftHops:1, weftSag:0, weftSpan:"wall", weftMax:4, edgeRails:true, ribTension:250, maxSag:40, bulbDrift:0, reserve:3,
+    borders:[], centre:{glyphs:["bigDiamond"],gap:2,dup:1,rowScale:1,fit:true}},
+  "Drawn · ±45 eye chain (1906)":{ layout:"lattice", tile:{motif:"drawn", dup:1, gap:0, stagger:0}, lat:{figure:"none",mode:"holes",density:4,scale:2,stagger:0,gapX:1,gapY:1}, latSpacing:2, latKind:"xx", railShare:0.3, drawn:{"kind":"xx","pitch":20,"angle":45,"a":[4,4],"b":[7,-3],"segs":[[5,6,6,7],[5,8,6,9],[5,10,6,11],[6,7,5,8],[6,9,5,10],[7,6,6,7],[7,6,8,7],[7,8,6,9],[7,10,6,11],[7,10,8,11],[8,7,7,8],[8,9,7,10],[9,6,8,7],[9,6,10,7],[9,8,8,9],[9,8,10,9],[9,10,8,11],[10,7,9,8],[10,9,9,10],[13,14,14,15],[13,16,14,17],[13,18,14,19],[14,15,13,16],[14,17,13,18],[15,14,14,15],[15,14,16,15],[15,16,14,17],[15,18,14,19],[15,18,16,19],[16,15,15,16],[16,17,15,18],[17,14,16,15],[17,14,18,15],[17,16,16,17],[17,16,18,17],[17,18,16,19],[18,15,17,16],[18,17,17,18]]}, latStep:1, latPattern:false, latFlow:true, routeMode:"chain", cableLen:9, flowLight:0.02, baseFrac:0.05, netPre:200, baseEnd:0.6, latAngle:45, patMoves:"all", latFrame:"rotated", latFree:true, patSpacing:2, latMove:"straight", latWarp:"both", latTurn:0.5, latCell:1, latReach:8, grid:true, gridPitch:0.10, gridRowPitch:0, diagonal:true, maxStep:2, laneOff:0, margin:0, rowScale:1, twine:0, twinePer:4, mirror:true, maxAng:45,
+    weftEvery:0, weftPhase:0, weftFloat:6, weftStep:3, weftJitter:0, weftHops:1, weftSag:0, weftSpan:"wall", weftMax:4, edgeRails:true, ribTension:250, maxSag:40, bulbDrift:0, reserve:3,
+    borders:[], centre:{glyphs:["bigDiamond"],gap:2,dup:1,rowScale:1,fit:true}},
+  "Flow · cross net V+D":{ layout:"lattice", tile:{motif:"bricks", dup:1, gap:0, stagger:2}, lat:{figure:"none",mode:"holes",density:4,scale:2,stagger:0,gapX:1,gapY:1}, latSpacing:2, latKind:"vd", railShare:0.3, latStep:1, latPattern:false, latFlow:true, baseFrac:0.05, netPre:200, baseEnd:0.6, latAngle:45, patMoves:"all", latFrame:"rotated", latFree:true, patSpacing:2, latMove:"straight", latWarp:"both", latTurn:0.5, latCell:1, latReach:8, grid:true, gridPitch:0.10, gridRowPitch:0, diagonal:true, maxStep:2, laneOff:0, margin:0, rowScale:1, twine:0, twinePer:4, mirror:true, maxAng:45,
+    weftEvery:0, weftPhase:0, weftFloat:6, weftStep:3, weftJitter:0, weftHops:1, weftSag:0, weftSpan:"wall", weftMax:4, edgeRails:true, ribTension:250, maxSag:40, bulbDrift:0, reserve:3,
+    borders:[], centre:{glyphs:["bigDiamond"],gap:2,dup:1,rowScale:1,fit:true}},
+  "Flow · eyes":{ layout:"lattice", tile:{motif:"box3", dup:1, gap:1, stagger:0}, lat:{figure:"none",mode:"holes",density:4,scale:2,stagger:0,gapX:1,gapY:1}, latSpacing:4, latStep:1, latPattern:false, latFlow:true, baseFrac:0.05, netPre:200, baseEnd:0.6, latAngle:45, patMoves:"all", latFrame:"rotated", latFree:true, patSpacing:2, latMove:"straight", latWarp:"both", latTurn:0.5, latCell:1, latReach:8, grid:true, gridPitch:0.10, gridRowPitch:0, diagonal:true, maxStep:2, laneOff:0, margin:0, rowScale:1, twine:0, twinePer:4, mirror:true, maxAng:45,
+    weftEvery:0, weftPhase:0, weftFloat:6, weftStep:3, weftJitter:0, weftHops:1, weftSag:0, weftSpan:"wall", weftMax:4, edgeRails:true, ribTension:250, maxSag:40, bulbDrift:0, reserve:3,
+    borders:[], centre:{glyphs:["bigDiamond"],gap:2,dup:1,rowScale:1,fit:true}},
+  "Flow · big eyes":{ layout:"lattice", tile:{motif:"box", dup:1, gap:2, stagger:0}, lat:{figure:"none",mode:"holes",density:4,scale:2,stagger:0,gapX:1,gapY:1}, latSpacing:4, latStep:1, latPattern:false, latFlow:true, baseFrac:0.05, netPre:200, baseEnd:0.6, latAngle:45, patMoves:"all", latFrame:"rotated", latFree:true, patSpacing:2, latMove:"straight", latWarp:"both", latTurn:0.5, latCell:1, latReach:8, grid:true, gridPitch:0.10, gridRowPitch:0, diagonal:true, maxStep:2, laneOff:0, margin:0, rowScale:1, twine:0, twinePer:4, mirror:true, maxAng:45,
+    weftEvery:0, weftPhase:0, weftFloat:6, weftStep:3, weftJitter:0, weftHops:1, weftSag:0, weftSpan:"wall", weftMax:4, edgeRails:true, ribTension:250, maxSag:40, bulbDrift:0, reserve:3,
+    borders:[], centre:{glyphs:["bigDiamond"],gap:2,dup:1,rowScale:1,fit:true}},
+  "Flow · bricks":{ layout:"lattice", tile:{motif:"bricks", dup:1, gap:0, stagger:2}, lat:{figure:"none",mode:"holes",density:4,scale:2,stagger:0,gapX:1,gapY:1}, latSpacing:4, latStep:1, latPattern:false, latFlow:true, baseFrac:0.05, netPre:200, baseEnd:0.6, latAngle:45, patMoves:"all", latFrame:"rotated", latFree:true, patSpacing:2, latMove:"straight", latWarp:"both", latTurn:0.5, latCell:1, latReach:8, grid:true, gridPitch:0.10, gridRowPitch:0, diagonal:true, maxStep:2, laneOff:0, margin:0, rowScale:1, twine:0, twinePer:4, mirror:true, maxAng:45,
+    weftEvery:0, weftPhase:0, weftFloat:6, weftStep:3, weftJitter:0, weftHops:1, weftSag:0, weftSpan:"wall", weftMax:4, edgeRails:true, ribTension:250, maxSag:40, bulbDrift:0, reserve:3,
+    borders:[], centre:{glyphs:["bigDiamond"],gap:2,dup:1,rowScale:1,fit:true}},
+  "Flow · cells":{ layout:"lattice", tile:{motif:"cells", dup:1, gap:0, stagger:1}, lat:{figure:"none",mode:"holes",density:4,scale:2,stagger:0,gapX:1,gapY:1}, latSpacing:4, latStep:1, latPattern:false, latFlow:true, baseFrac:0.05, netPre:200, baseEnd:0.6, latAngle:45, patMoves:"all", latFrame:"rotated", latFree:true, patSpacing:2, latMove:"straight", latWarp:"both", latTurn:0.5, latCell:1, latReach:8, grid:true, gridPitch:0.10, gridRowPitch:0, diagonal:true, maxStep:2, laneOff:0, margin:0, rowScale:1, twine:0, twinePer:4, mirror:true, maxAng:45,
+    weftEvery:0, weftPhase:0, weftFloat:6, weftStep:3, weftJitter:0, weftHops:1, weftSag:0, weftSpan:"wall", weftMax:4, edgeRails:true, ribTension:250, maxSag:40, bulbDrift:0, reserve:3,
+    borders:[], centre:{glyphs:["bigDiamond"],gap:2,dup:1,rowScale:1,fit:true}},
+  "Flow · diamonds":{ layout:"lattice", tile:{motif:"block", dup:1, gap:2, stagger:0}, lat:{figure:"none",mode:"holes",density:4,scale:2,stagger:0,gapX:1,gapY:1}, latSpacing:4, latStep:1, latPattern:false, latFlow:true, baseFrac:0.05, netPre:200, baseEnd:0.6, latAngle:45, patMoves:"all", latFrame:"rotated", latFree:true, patSpacing:2, latMove:"straight", latWarp:"both", latTurn:0.5, latCell:1, latReach:8, grid:true, gridPitch:0.10, gridRowPitch:0, diagonal:true, maxStep:2, laneOff:0, margin:0, rowScale:1, twine:0, twinePer:4, mirror:true, maxAng:45,
+    weftEvery:0, weftPhase:0, weftFloat:6, weftStep:3, weftJitter:0, weftHops:1, weftSag:0, weftSpan:"wall", weftMax:4, edgeRails:true, ribTension:250, maxSag:40, bulbDrift:0, reserve:3,
+    borders:[], centre:{glyphs:["bigDiamond"],gap:2,dup:1,rowScale:1,fit:true}},
+  "Flow · pebbles":{ layout:"lattice", tile:{motif:"checker", dup:1, gap:0, stagger:0}, lat:{figure:"none",mode:"holes",density:4,scale:2,stagger:0,gapX:1,gapY:1}, latSpacing:4, latStep:1, latPattern:false, latFlow:true, baseFrac:0.05, netPre:200, baseEnd:0.6, latAngle:45, patMoves:"all", latFrame:"rotated", latFree:true, patSpacing:2, latMove:"straight", latWarp:"both", latTurn:0.5, latCell:1, latReach:8, grid:true, gridPitch:0.10, gridRowPitch:0, diagonal:true, maxStep:2, laneOff:0, margin:0, rowScale:1, twine:0, twinePer:4, mirror:true, maxAng:45,
+    weftEvery:0, weftPhase:0, weftFloat:6, weftStep:3, weftJitter:0, weftHops:1, weftSag:0, weftSpan:"wall", weftMax:4, edgeRails:true, ribTension:250, maxSag:40, bulbDrift:0, reserve:3,
+    borders:[], centre:{glyphs:["bigDiamond"],gap:2,dup:1,rowScale:1,fit:true}},
+  "Flow · eye (tile chart)":{ layout:"lattice", tile:{motif:"ein", dup:1, gap:1, stagger:3}, lat:{figure:"none",mode:"holes",density:4,scale:2,stagger:0,gapX:1,gapY:1}, latSpacing:4, latStep:1, latPattern:false, latFlow:true, baseFrac:0.05, netPre:200, baseEnd:0.6, latAngle:45, patMoves:"all", latFrame:"rotated", latFree:true, patSpacing:2, latMove:"straight", latWarp:"both", latTurn:0.5, latCell:1, latReach:8, grid:true, gridPitch:0.10, gridRowPitch:0, diagonal:true, maxStep:2, laneOff:0, margin:0, rowScale:1, twine:0, twinePer:4, mirror:true, maxAng:45,
+    weftEvery:0, weftPhase:0, weftFloat:6, weftStep:3, weftJitter:0, weftHops:1, weftSag:0, weftSpan:"wall", weftMax:4, edgeRails:true, ribTension:250, maxSag:40, bulbDrift:0, reserve:3,
+    borders:[], centre:{glyphs:["bigDiamond"],gap:2,dup:1,rowScale:1,fit:true}},
   "Eye lattice":     { layout:"tile", tile:{motif:"ein",     dup:1, gap:1, stagger:3}, grid:true, gridPitch:0.10, maxStep:2, laneOff:0, margin:0, rowScale:1, twine:1, twinePer:4, mirror:true, maxAng:45,
     weftEvery:1, weftPhase:0, weftFloat:6, weftStep:3, weftJitter:0, weftHops:1, weftSag:0, weftSpan:"wall", weftMax:4, edgeRails:true, ribTension:250, maxSag:40,
     borders:[], centre:{glyphs:["bigDiamond"],gap:2,dup:1,rowScale:1,fit:true}},
   "Diamond net":     { layout:"tile", tile:{motif:"zigzag",  dup:1, gap:1, stagger:4}, grid:true, gridPitch:0.10, maxStep:2, laneOff:0, margin:0, rowScale:1, twine:1, twinePer:4, mirror:true, maxAng:45,
     weftEvery:1, weftPhase:0, weftFloat:6, weftStep:3, weftJitter:0, weftHops:1, weftSag:0, weftSpan:"wall", weftMax:4, edgeRails:true, ribTension:250, maxSag:40,
+    borders:[], centre:{glyphs:["bigDiamond"],gap:2,dup:1,rowScale:1,fit:true}},
+  "Lattice 45°":     { layout:"lattice", latAngle:45, latSpacing:2, latStep:1, lat:{figure:"none",scale:2,stagger:0,gapX:1,gapY:1}, grid:true, gridPitch:0.10, gridRowPitch:0,     diagonal:true, maxStep:2, laneOff:0, margin:0, rowScale:1, twine:0, twinePer:4, mirror:true, maxAng:45,
+    weftEvery:0, weftPhase:0, weftFloat:6, weftStep:3, weftJitter:0, weftHops:1, weftSag:0, weftSpan:"wall", weftMax:4, edgeRails:true, ribTension:250, maxSag:40, bulbDrift:0,
+    tile:{motif:"ein",dup:1,gap:1,stagger:3}, borders:[], centre:{glyphs:["bigDiamond"],gap:2,dup:1,rowScale:1,fit:true}},
+  "Lattice 30°":     { layout:"lattice", latAngle:30, latSpacing:2, latStep:1, lat:{figure:"none",scale:2,stagger:0,gapX:1,gapY:1}, grid:true, gridPitch:0.10, gridRowPitch:0.173, diagonal:true, maxStep:2, laneOff:0, margin:0, rowScale:1, twine:0, twinePer:4, mirror:true, maxAng:45,
+    weftEvery:0, weftPhase:0, weftFloat:6, weftStep:3, weftJitter:0, weftHops:1, weftSag:0, weftSpan:"wall", weftMax:4, edgeRails:true, ribTension:250, maxSag:40, bulbDrift:0,
+    tile:{motif:"ein",dup:1,gap:1,stagger:3}, borders:[], centre:{glyphs:["bigDiamond"],gap:2,dup:1,rowScale:1,fit:true}},
+  "Lattice 60°":     { layout:"lattice", latAngle:60, latSpacing:1, latStep:2, lat:{figure:"none",scale:2,stagger:0,gapX:1,gapY:1}, grid:true, gridPitch:0.10, gridRowPitch:0.115, diagonal:true, maxStep:2, laneOff:0, margin:0, rowScale:1, twine:0, twinePer:4, mirror:true, maxAng:45,
+    weftEvery:0, weftPhase:0, weftFloat:6, weftStep:3, weftJitter:0, weftHops:1, weftSag:0, weftSpan:"wall", weftMax:4, edgeRails:true, ribTension:250, maxSag:40, bulbDrift:0,
+    tile:{motif:"ein",dup:1,gap:1,stagger:3}, borders:[], centre:{glyphs:["bigDiamond"],gap:2,dup:1,rowScale:1,fit:true}},
+  "Lattice + eyes":    { layout:"lattice", tile:{motif:"ein",     dup:1, gap:1, stagger:3}, lat:{figure:"none",mode:"holes",density:4,scale:2,stagger:0,gapX:1,gapY:1}, latSpacing:4, latStep:1, latPattern:true, baseFrac:0.04, netPre:200, baseEnd:0.6, latAngle:45, patMoves:"all", latFrame:"rotated", latFree:true, patSpacing:2, latMove:"straight", latWarp:"both", latTurn:0.5, latCell:1, latReach:8, grid:true, gridPitch:0.10, gridRowPitch:0, diagonal:true, maxStep:2, laneOff:0, margin:0, rowScale:1, twine:0, twinePer:4, mirror:true, maxAng:45,
+    weftEvery:0, weftPhase:0, weftFloat:6, weftStep:3, weftJitter:0, weftHops:1, weftSag:0, weftSpan:"wall", weftMax:4, edgeRails:true, ribTension:250, maxSag:40, bulbDrift:0, reserve:3,
+    borders:[], centre:{glyphs:["bigDiamond"],gap:2,dup:1,rowScale:1,fit:true}},
+  "Lattice + zigzag":  { layout:"lattice", tile:{motif:"zigzag",  dup:1, gap:1, stagger:4}, lat:{figure:"none",mode:"holes",density:4,scale:2,stagger:0,gapX:1,gapY:1}, latSpacing:4, latStep:1, latPattern:true, baseFrac:0.04, netPre:200, baseEnd:0.6, latAngle:45, patMoves:"all", latFrame:"rotated", latFree:true, patSpacing:2, latMove:"straight", latWarp:"both", latTurn:0.5, latCell:1, latReach:8, grid:true, gridPitch:0.10, gridRowPitch:0, diagonal:true, maxStep:2, laneOff:0, margin:0, rowScale:1, twine:0, twinePer:4, mirror:true, maxAng:45,
+    weftEvery:0, weftPhase:0, weftFloat:6, weftStep:3, weftJitter:0, weftHops:1, weftSag:0, weftSpan:"wall", weftMax:4, edgeRails:true, ribTension:250, maxSag:40, bulbDrift:0, reserve:3,
+    borders:[], centre:{glyphs:["bigDiamond"],gap:2,dup:1,rowScale:1,fit:true}},
+  "Lattice + bricks": { layout:"lattice", tile:{motif:"bricks",   dup:1, gap:0, stagger:2}, lat:{figure:"none",mode:"holes",density:4,scale:2,stagger:0,gapX:1,gapY:1}, latSpacing:2, latStep:1, latPattern:true, baseFrac:0.07, netPre:200, baseEnd:0.6, latAngle:45, patMoves:"diag", latFrame:"edge", drawn:null, routeMode:"flow", cableLen:9, flowSink:true, sinkBoost:1, latKind:"xx", railShare:0.15, latFlow:false, flowLight:0.04, latFree:false, patSpacing:2, latMove:"straight", latWarp:"both", latTurn:0.5, latCell:1, latReach:8, grid:true, gridPitch:0.10, gridRowPitch:0, diagonal:true, maxStep:2, laneOff:0, margin:0, rowScale:1, twine:0, twinePer:4, mirror:true, maxAng:45,
+    weftEvery:0, weftPhase:0, weftFloat:6, weftStep:3, weftJitter:0, weftHops:1, weftSag:0, weftSpan:"wall", weftMax:4, edgeRails:true, ribTension:250, maxSag:40, bulbDrift:0, reserve:3,
+    borders:[], centre:{glyphs:["bigDiamond"],gap:2,dup:1,rowScale:1,fit:true}},
+  "Lattice + cells":  { layout:"lattice", tile:{motif:"cells" ,   dup:1, gap:0, stagger:1}, lat:{figure:"none",mode:"holes",density:4,scale:2,stagger:0,gapX:1,gapY:1}, latSpacing:2, latStep:1, latPattern:true, baseFrac:0.07, netPre:200, baseEnd:0.6, latAngle:45, patMoves:"diag", latFrame:"edge", drawn:null, routeMode:"flow", cableLen:9, flowSink:true, sinkBoost:1, latKind:"xx", railShare:0.15, latFlow:false, flowLight:0.04, latFree:false, patSpacing:2, latMove:"straight", latWarp:"both", latTurn:0.5, latCell:1, latReach:8, grid:true, gridPitch:0.10, gridRowPitch:0, diagonal:true, maxStep:2, laneOff:0, margin:0, rowScale:1, twine:0, twinePer:4, mirror:true, maxAng:45,
+    weftEvery:0, weftPhase:0, weftFloat:6, weftStep:3, weftJitter:0, weftHops:1, weftSag:0, weftSpan:"wall", weftMax:4, edgeRails:true, ribTension:250, maxSag:40, bulbDrift:0, reserve:3,
+    borders:[], centre:{glyphs:["bigDiamond"],gap:2,dup:1,rowScale:1,fit:true}},
+  "Lattice + diamonds":{ layout:"lattice", tile:{motif:"diamond", dup:1, gap:1, stagger:2}, lat:{figure:"none",mode:"holes",density:4,scale:2,stagger:0,gapX:1,gapY:1}, latSpacing:4, latStep:1, latPattern:true, baseFrac:0.04, netPre:200, baseEnd:0.6, latAngle:45, patMoves:"all", latFrame:"rotated", latFree:true, patSpacing:2, latMove:"straight", latWarp:"both", latTurn:0.5, latCell:1, latReach:8, grid:true, gridPitch:0.10, gridRowPitch:0, diagonal:true, maxStep:2, laneOff:0, margin:0, rowScale:1, twine:0, twinePer:4, mirror:true, maxAng:45,
+    weftEvery:0, weftPhase:0, weftFloat:6, weftStep:3, weftJitter:0, weftHops:1, weftSag:0, weftSpan:"wall", weftMax:4, edgeRails:true, ribTension:250, maxSag:40, bulbDrift:0, reserve:3,
+    borders:[], centre:{glyphs:["bigDiamond"],gap:2,dup:1,rowScale:1,fit:true}},
+  "Lattice + pebbles": { layout:"lattice", tile:{motif:"uwairjan",dup:1, gap:1, stagger:2}, lat:{figure:"none",mode:"holes",density:4,scale:2,stagger:0,gapX:1,gapY:1}, latSpacing:4, latStep:1, latPattern:true, baseFrac:0.04, netPre:200, baseEnd:0.6, latAngle:45, patMoves:"all", latFrame:"rotated", latFree:true, patSpacing:2, latMove:"straight", latWarp:"both", latTurn:0.5, latCell:1, latReach:8, grid:true, gridPitch:0.10, gridRowPitch:0, diagonal:true, maxStep:2, laneOff:0, margin:0, rowScale:1, twine:0, twinePer:4, mirror:true, maxAng:45,
+    weftEvery:0, weftPhase:0, weftFloat:6, weftStep:3, weftJitter:0, weftHops:1, weftSag:0, weftSpan:"wall", weftMax:4, edgeRails:true, ribTension:250, maxSag:40, bulbDrift:0, reserve:3,
+    borders:[], centre:{glyphs:["bigDiamond"],gap:2,dup:1,rowScale:1,fit:true}},
+  "Lattice · diamond holes":{ layout:"lattice", lat:{figure:"diamond", mode:"holes", density:4, scale:2, stagger:5, gapX:2, gapY:2}, latSpacing:2, latStep:1, latPattern:true, baseFrac:0.08, netPre:200, baseEnd:0.75, latAngle:45, patMoves:"diag", latFrame:"upright", latReach:8, tile:{motif:"ground",dup:1,gap:0,stagger:0}, grid:true, gridPitch:0.10, gridRowPitch:0, diagonal:true, maxStep:2, laneOff:0, margin:0, rowScale:1, twine:0, twinePer:4, mirror:true, maxAng:45,
+    weftEvery:0, weftPhase:0, weftFloat:6, weftStep:3, weftJitter:0, weftHops:1, weftSag:0, weftSpan:"wall", weftMax:4, edgeRails:true, ribTension:250, maxSag:40, bulbDrift:0, reserve:3,
+    borders:[], centre:{glyphs:["bigDiamond"],gap:2,dup:1,rowScale:1,fit:true}},
+  "Lattice · eye holes":    { layout:"lattice", lat:{figure:"glyph:bigDiamond", mode:"holes", density:4, scale:2, stagger:9, gapX:2, gapY:3}, latSpacing:2, latStep:1, latPattern:true, baseFrac:0.08, netPre:200, baseEnd:0.75, latAngle:45, patMoves:"diag", latFrame:"upright", latReach:8, tile:{motif:"ground",dup:1,gap:0,stagger:0}, grid:true, gridPitch:0.10, gridRowPitch:0, diagonal:true, maxStep:2, laneOff:0, margin:0, rowScale:1, twine:0, twinePer:4, mirror:true, maxAng:45,
+    weftEvery:0, weftPhase:0, weftFloat:6, weftStep:3, weftJitter:0, weftHops:1, weftSag:0, weftSpan:"wall", weftMax:4, edgeRails:true, ribTension:250, maxSag:40, bulbDrift:0, reserve:3,
+    borders:[], centre:{glyphs:["bigDiamond"],gap:2,dup:1,rowScale:1,fit:true}},
+  "Lattice · cross holes":  { layout:"lattice", lat:{figure:"cross", mode:"holes", density:5, scale:2, stagger:4, gapX:3, gapY:3}, latSpacing:2, latStep:1, latPattern:true, baseFrac:0.08, netPre:200, baseEnd:0.75, latAngle:45, patMoves:"diag", latFrame:"upright", latReach:8, tile:{motif:"ground",dup:1,gap:0,stagger:0}, grid:true, gridPitch:0.10, gridRowPitch:0, diagonal:true, maxStep:2, laneOff:0, margin:0, rowScale:1, twine:0, twinePer:4, mirror:true, maxAng:45,
+    weftEvery:0, weftPhase:0, weftFloat:6, weftStep:3, weftJitter:0, weftHops:1, weftSag:0, weftSpan:"wall", weftMax:4, edgeRails:true, ribTension:250, maxSag:40, bulbDrift:0, reserve:3,
+    borders:[], centre:{glyphs:["bigDiamond"],gap:2,dup:1,rowScale:1,fit:true}},
+  "Lattice · steps (density)":{ layout:"lattice", lat:{figure:"glyph:steps", mode:"density", density:0.3, scale:2, stagger:5, gapX:2, gapY:3}, latSpacing:2, latStep:1, latPattern:true, baseFrac:0.08, netPre:200, baseEnd:0.75, latAngle:45, patMoves:"diag", latFrame:"upright", latReach:8, tile:{motif:"ground",dup:1,gap:0,stagger:0}, grid:true, gridPitch:0.10, gridRowPitch:0, diagonal:true, maxStep:2, laneOff:0, margin:0, rowScale:1, twine:0, twinePer:4, mirror:true, maxAng:45,
+    weftEvery:0, weftPhase:0, weftFloat:6, weftStep:3, weftJitter:0, weftHops:1, weftSag:0, weftSpan:"wall", weftMax:4, edgeRails:true, ribTension:250, maxSag:40, bulbDrift:0, reserve:3,
+    borders:[], centre:{glyphs:["bigDiamond"],gap:2,dup:1,rowScale:1,fit:true}},
+  "Diagonals 45°":   { layout:"tile", tile:{motif:"zigzag",  dup:1, gap:1, stagger:4}, grid:true, gridPitch:0.10, gridRowPitch:0,     diagonal:true, maxStep:1, laneOff:0, margin:0, rowScale:1, twine:1, twinePer:4, mirror:true, maxAng:45,
+    weftEvery:1, weftPhase:0, weftFloat:6, weftStep:3, weftJitter:0, weftHops:1, weftSag:0, weftSpan:"wall", weftMax:4, edgeRails:true, ribTension:250, maxSag:40,
+    borders:[], centre:{glyphs:["bigDiamond"],gap:2,dup:1,rowScale:1,fit:true}},
+  "Diagonals 30°":   { layout:"tile", tile:{motif:"zigzag",  dup:1, gap:1, stagger:4}, grid:true, gridPitch:0.10, gridRowPitch:0.173, diagonal:true, maxStep:1, laneOff:0, margin:0, rowScale:1, twine:1, twinePer:3, mirror:true, maxAng:45,
+    weftEvery:1, weftPhase:0, weftFloat:6, weftStep:3, weftJitter:0, weftHops:1, weftSag:0, weftSpan:"wall", weftMax:4, edgeRails:true, ribTension:250, maxSag:40,
+    borders:[], centre:{glyphs:["bigDiamond"],gap:2,dup:1,rowScale:1,fit:true}},
+  "Diagonals 60°":   { layout:"tile", tile:{motif:"zigzag2", dup:1, gap:1, stagger:4}, grid:true, gridPitch:0.10, gridRowPitch:0.115, diagonal:true, maxStep:2, laneOff:0, margin:0, rowScale:1, twine:1, twinePer:4, mirror:true, maxAng:45,
+    weftEvery:1, weftPhase:0, weftFloat:6, weftStep:3, weftJitter:0, weftHops:1, weftSag:0, weftSpan:"wall", weftMax:4, edgeRails:true, ribTension:350, maxSag:40,
     borders:[], centre:{glyphs:["bigDiamond"],gap:2,dup:1,rowScale:1,fit:true}},
   "Pebble field":    { layout:"tile", tile:{motif:"uwairjan",dup:1, gap:1, stagger:2}, grid:true, gridPitch:0.10, maxStep:1, laneOff:0, margin:0, rowScale:2, twine:1, twinePer:4, mirror:true, maxAng:45,
     weftEvery:1, weftPhase:0, weftFloat:6, weftStep:3, weftJitter:0, weftHops:1, weftSag:0, weftSpan:"wall", weftMax:4, edgeRails:true, ribTension:250, maxSag:40,
@@ -526,15 +722,17 @@ const PRESETS = {
 const P = {
   seed:12345, width:7, height:7, count:1000, dia:5.5, gpm:40, bulbMass:120,
   rows:32, maxDepth:6.9, margin:0, maxAng:45, snap:0, pack:1,
-  grid:true, gridPitch:0.10, maxStep:2, laneOff:0, edgeRails:true, ribTension:250, maxSag:40, reserve:3,
-  layout:"tile", tile:{motif:"ein", dup:1, gap:1, stagger:3},
+  grid:true, gridPitch:0.10, gridRowPitch:0, diagonal:false, maxStep:2, laneOff:0, edgeRails:true, ribTension:250, maxSag:40, reserve:3,
+  layout:"tile", tile:{motif:"ein", dup:1, gap:1, stagger:3}, latSpacing:2, latStep:1,
+  lat:{figure:"none", mode:"holes", density:4, scale:2, stagger:0, gapX:1, gapY:1},
+  latPattern:false, baseFrac:0.25, netPre:100, baseEnd:0.6, latAngle:45, patMoves:"diag", latFrame:"edge", drawn:null, routeMode:"flow", cableLen:9, flowSink:true, sinkBoost:1, latKind:"xx", railShare:0.15, latFlow:false, flowLight:0.04, latFree:false, patSpacing:2, latMove:"straight", latWarp:"both", latTurn:0.5, latCell:1, latReach:8,
   rowScale:1, twine:1.0, twinePer:4, mirror:true,
   weftEvery:1, weftPhase:0, weftFloat:6, weftStep:3, weftJitter:0, weftHops:1, weftSag:0.0, weftSpan:"wall", weftMax:4,
-  shedGamma:0.75, tailFactor:1.4, bnTries:14, topClear:0.4, minGap:60,
+  shedGamma:0.75, tailFactor:1.4, bnTries:14, topClear:0.4, minGap:60, bulbSeed:12345, bulbDrift:0.5, bulbReach:2,
   borders: PRESETS["Sadu strip (default)"].borders.map(b=>({...b})),
   centre: {...PRESETS["Sadu strip (default)"].centre, glyphs:[...PRESETS["Sadu strip (default)"].centre.glyphs], fit:true},
 };
-let view="weave", polarity=1, blurPx=4, gain=1.2, showGrid=false;
+let view="weave", polarity=1, gain=1.2, showGrid=false;
 let D = null;
 
 /* ═══════════════════════ COMPOSITION ═══════════════════════ */
@@ -559,9 +757,14 @@ function centreRows(P, Reff){
 /* lay the bands out left → right: borders, centre, mirrored borders */
 function compose(P, padTo, Reff){
   const seq=[]; let cols=0;
-  if(P.layout==="tile"){
+  if(P.layout==="lattice" && !P.latPattern){
+    const n=Math.max(2, padTo|0 || Math.round(P.width/0.1));
+    seq.push({id:0, rows:["1".repeat(n)], k:n, dup:1, cols:n, c0:0, mirror:false, isCentre:false, isGround:false, isLattice:true, phase:0, rs:1, name:"lattice"});
+    return {seq, cols:n, compCols:n};
+  }
+  if(P.layout==="tile" || (P.layout==="lattice" && P.latPattern)){
     /* one motif across the whole width, columns staggered down by `stagger` rows */
-    const m=LEX[P.tile.motif]||LEX.ein, k=m.rows[0].length, dup=Math.max(1,P.tile.dup|0), gap=Math.max(0,P.tile.gap|0), st=Math.max(0,P.tile.stagger|0);
+    const m=motifOf(P.tile.motif), k=m.rows[0].length, dup=Math.max(1,P.tile.dup|0), gap=Math.max(0,P.tile.gap|0), st=Math.max(0,P.tile.stagger|0);
     const target=Math.max(k*dup, padTo|0 || Math.round(P.width/0.1));
     let i=0;
     while(cols + k*dup <= target){
@@ -603,9 +806,18 @@ function compose(P, padTo, Reff){
 const rowBits=(band,r)=> band.rows[pmod(Math.floor(r/band.rs)+band.phase, band.rows.length)];
 
 /* ═══════════════════════ GENERATOR ═══════════════════════ */
-function generate(P){
+function generate(P, planIn){
+  /* a bulb seed different from the design seed means two passes: the design
+     seed fixes how many cables leave each strand at each row (the plan); the
+     second pass keeps that plan — so every strand path and rib is identical —
+     and only re-decides which cables drop, their tails and their drift        */
+  const bulbSeed = (P.bulbSeed==null ? P.seed : P.bulbSeed);
+  if(!planIn && bulbSeed!==P.seed){ const base=generate(Object.assign({},P,{bulbSeed:P.seed})); return generate(P, {rows:base.plan, floats:base.floatPlan}); }
   const t0 = performance.now();
-  const rng = mulberry32(P.seed>>>0);
+  const rng = mulberry32(P.seed>>>0);                        // weave decisions
+  const rngB = mulberry32(bulbSeed>>>0);                     // bulb decisions
+  const plan = [], floatPlan = []; let dropRuns=0, dropLen=0;
+  const replay = planIn ? planIn.floats : null;
   const W=P.width, H=P.height, N=P.count;
   const dia = P.dia/1000;
   const maxD = Math.min(P.maxDepth, H);
@@ -613,7 +825,12 @@ function generate(P){
   const gridOn = !!P.grid;
   /* on a grid, the tie rows ARE the grid rows */
   const gridCols = gridOn ? Math.max(2, Math.round((W-2*mg)/P.gridPitch)) : 0;
-  const R = gridOn ? Math.max(4, Math.round(maxD/P.gridPitch)) : P.rows;
+  const lattice = P.layout==="lattice", latFlow = lattice && !!P.latFlow && !P.latPattern, latPat = lattice && !!P.latPattern;
+  const latVD = lattice && P.latKind==="vd" && !latPat;        // carrier = verticals + one diagonal family (down-right), no reflection
+  const rowPitch = lattice ? Math.max(1,P.latStep|0)*P.gridPitch/Math.tan(clamp(P.latAngle||45,15,75)*Math.PI/180)
+                 : ((gridOn && P.gridRowPitch>0) ? P.gridRowPitch : P.gridPitch);
+  const R = gridOn ? Math.max(4, Math.round(maxD/rowPitch)) : P.rows;
+  const diag = gridOn && (!!P.diagonal || lattice);
   const dy = maxD/R;
   const snap = (P.snap||0)/1000;
 
@@ -624,7 +841,59 @@ function generate(P){
   const bw = n => n<=0?0 : lerp(n*dia, dia*Math.sqrt(n/0.9), P.pack);
   const allNodes=[]; let nid=0, cid=0;
   let S=0; for(const b of L.seq) S+=b.cols;
-  const perStrand=Math.floor(N/S), extra=N%S;
+  let perStrand=Math.floor(N/S), extra=N%S;
+  const baseNodes=[];
+  if(lattice){
+    /* base lattice: two strands per start column, one per family; straight
+       diagonals that reflect off the rails. With pattern strands the base takes
+       baseFrac of the cables and every column is a start (so every node exists) */
+    const b=latPat ? {id:-1, rows:["1"], k:1, dup:1, cols:L.cols, c0:0, mirror:false, isCentre:false, isGround:false, isLattice:true, phase:0, rs:1, name:"base", strands:[]} : L.seq[0];
+    if(!latPat) b.strands=[];
+    const sp=Math.max(1,P.latSpacing|0), starts=[]; for(let c=0;c<L.cols;c+=sp) starts.push(c);
+    const baseN = latPat ? Math.round(N*clamp(P.baseFrac,0.05,0.6)) : N;
+    let SB=0;
+    if(latVD){
+      /* verticals + one diagonal family.  Starts at spB/2 + k·spB; a diagonal that
+         reaches the right rail hands its cables to the rail vertical; diagonals
+         also enter from the LEFT rail (born at rows spB/2 + k·spB) fed by the
+         left-rail vertical, which starts with `rail share` of the cables.       */
+      const hs=Math.max(1,Math.round(sp/2)); const vStarts=[]; for(let c=hs;c<L.cols;c+=sp) vStarts.push(c);
+      const railShare=clamp(P.railShare??0.15,0,0.6); const railN=Math.round(N*railShare), restN=N-railN;
+      const nTop=vStarts.length*2; const per2=Math.floor(restN/nTop), extra2=restN%nTop; let k=0;
+      const mk=(c0,kind,birth,cabs)=>{ const nd={id:nid++, band:b, c:c0, cell:c0, dir: kind==="v" ? -1 : 1, vd:kind, span:colPitch, xBase:mg+(c0+0.5)*colPitch, cables:cabs,
+                structural:false, isBase:true, birth, parent:null, forkX:null, path:[], count:[], level:0}; b.strands.push(nd); allNodes.push(nd); baseNodes.push(nd); return nd; };
+      for(const c0 of vStarts) for(const kind of ["v","d"]){ const n=per2+(k<extra2?1:0); k++; const cabs=[]; for(let j=0;j<n;j++) cabs.push(cid++); mk(c0,kind,0,cabs); }
+      { const cabs=[]; for(let j=0;j<railN;j++) cabs.push(cid++); const rl=mk(0,"v",0,cabs); rl.rail="L"; }
+      { const rr=mk(L.cols-1,"v",0,[]); rr.rail="R"; }
+      for(let bth=hs; bth<=R; bth+=sp) mk(0,"d",bth,[]);
+      SB=b.strands.length;
+    } else {
+    SB=starts.length*2; const per2=Math.floor(baseN/SB), extra2=baseN%SB; let k=0;
+    for(const c0 of starts) for(const dir of [1,-1]){
+      const n=per2+(k<extra2?1:0); k++;
+      const cabs=[]; for(let j=0;j<n;j++) cabs.push(cid++);
+      const nd={id:nid++, band:b, c:c0, cell:c0, dir, span:colPitch, xBase:mg+(c0+0.5)*colPitch, cables:cabs,
+                structural:latPat, isBase:true, birth:0, parent:null, forkX:null, path:[], count:[], level:0};
+      b.strands.push(nd); allNodes.push(nd); baseNodes.push(nd);
+    } }
+    if(latPat){
+      /* pattern strands: one per chart column, the remaining cables */
+      /* pattern strands only where base nodes exist: start columns of the base parity */
+      /* two per start column, one each way (as the base), so every lattice line
+         carries a bundle from the top and each figure is reached from both sides   */
+      const spP = P.latFree ? Math.max(1,P.patSpacing|0) : sp;                               // free ties: the pattern's own start pitch
+      const patN=N-baseN; let SP=0; for(const bb of L.seq) for(let c=0;c<bb.cols;c++) if((bb.c0+c)%spP===0) SP+=2; S=SB+SP;
+      const per3=Math.floor(patN/Math.max(1,SP)), extra3=patN%Math.max(1,SP); let q=0;
+      for(const bb of L.seq){ bb.strands=[];
+        for(let c=0;c<bb.cols;c++){ if((bb.c0+c)%spP!==0) continue;
+          for(const dir0 of (P.latWarp==="warp" ? [1,1] : [1,-1])){ const n=per3+(q<extra3?1:0); q++;
+            const cabs=[]; for(let j=0;j<n;j++) cabs.push(cid++);
+            const nd={id:nid++, band:bb, c, cell:c, span:colPitch, xBase:mg+(bb.c0+c+0.5)*colPitch, cables:cabs,
+                      structural:false, isPattern:true, dir0, birth:0, parent:null, forkX:null, path:[], count:[], level:0};
+            bb.strands.push(nd); allNodes.push(nd); } }
+      }
+    } else S=SB;
+  } else
   for(const b of L.seq){
     b.strands=[];
     for(let c=0;c<b.cols;c++){
@@ -635,6 +904,181 @@ function generate(P){
       b.strands.push(nd); allNodes.push(nd);
     }
   }
+  /* the figure: a mask of cells the net may not enter, tiled and staggered */
+  const figRows=(()=>{ const f=(P.lat&&P.lat.figure)||"none"; if(f==="none") return null;
+    if(f.startsWith("glyph:")) return (GLYPHS[f.slice(6)]||GLYPHS.bigDiamond).rows; return (LEX[f]||LEX.ein).rows; })();
+  const voidMask = new Uint8Array(L.cols*(R+1));      // the figure, as cells
+  const holes = lattice && figRows && (P.lat.mode||"mirror")==="holes";
+  const mirror = lattice && figRows && (P.lat.mode||"mirror")==="mirror";
+  const densFig = lattice && figRows && (P.lat.mode||"mirror")==="density", densK = Math.max(0.1, +P.lat.density||1);
+  let mirrorTurns=0;
+  if(lattice && figRows){
+    const k=figRows[0].length, h=figRows.length, sc=Math.max(1,P.lat.scale|0), gx=Math.max(0,P.lat.gapX|0), gy=Math.max(0,P.lat.gapY|0), st=Math.max(0,P.lat.stagger|0);
+    const px=(k+gx)*sc, py=(h+gy)*sc;
+    for(let r=0;r<=R;r++) for(let c=0;c<L.cols;c++){
+      const ti=Math.floor(c/px), cx=Math.floor((c%px)/sc), rr=r+ti*st, cy=Math.floor(((rr%py)+py)%py/sc);
+      if(cx<k && cy<h && figRows[cy][cx]==="1") voidMask[r*L.cols+c]=1;
+    }
+  }
+  const isVoid=(c,r)=> c<0||c>=L.cols ? true : !!voidMask[r*L.cols+c];
+  /* a strand's next column on the lattice: straight, reflected at the rails and at the figure */
+  const stepN=Math.max(1,P.latStep|0);
+  let bounces=0, maxRailPull=0, figBounces=0, passThrough=0, unbalanced=0, maxUnbalPull=0, maxUnbalShift=0;
+  const turnAt=[];                                            // {r,col,dir,T} figure turns, for balance
+  /* can a strand at column c, row r, heading d, take at least one legal step? */
+  const free=(x,r)=> x>=0&&x<L.cols&&!voidMask[r*L.cols+x];
+  const openAhead=(c,d,r,depth)=>{ if(r>R) return true; depth=depth||1;
+    const a=c+d*stepN, b=c-d*stepN;
+    const okA = free(a,r) && (depth<=1 || openAhead(a,d,r+1,depth-1));
+    const okB = free(b,r) && (depth<=1 || openAhead(b,-d,r+1,depth-1));
+    return okA||okB; };
+  let patTurns=0, patRefused=0, maxNodeShift=0; const latHops=[];
+  const Lseg=Math.hypot(stepN*colPitch, dy), thL=Math.atan2(stepN*colPitch,dy);
+  const tensionOf=(nd,r)=> nd.cables.length*(Math.max(0,(maxD-r*dy))*1.08*(P.gpm/1000)+P.bulbMass/1000)*G;
+  /* a pattern strand may only move along a lattice edge: exactly ±step per row.
+     It heads toward its chart target; a turn at a node is allowed only if the
+     node — a tied crossing of tensioned base strands — would not shift too far */
+  /* pattern bundles: at each row the bundle may first hop along the row line to the
+     next base node (horizontal), then descend along a lattice edge (±θ) or straight
+     down (vertical, which on a spacing-2 base must last two rows to land on a node).
+     Every direction change is a turn at a base node and must pass the stiffness test. */
+  const mv = P.patMoves||"all", allowV = mv==="diagV"||mv==="all", allowH = mv==="diagH"||mv==="all";
+  const spB = Math.max(1,P.latSpacing|0), sinT=Math.sin(thL);
+  const latFree = !!P.latFree;                                  // pattern bundles tie anywhere: their grid is their own, not the base node
+  const spP = latFree ? Math.max(1,P.patSpacing|0) : spB;       // pattern grid: start columns every spP (a cell is spP steps of the lattice)
+  const hopW = latFree ? spP : spB;                             // a horizontal hop spans one pattern cell or one base cell
+  let patV=0, patH=0, patD=0, patFly=0;
+  /* rotated chart frame: chart coordinates run along the two lattice directions,
+     u = (c+r)/2, v = (r−c)/2 in cells; the tile motif tiles that (u,v) plane   */
+  const frame = P.latFrame||"edge";
+  const rotFrame = latPat && frame!=="upright";                // the chart lives on the lattice nodes
+  const tm = motifOf(P.tile.motif), tk=tm.rows[0].length, th=tm.rows.length;
+  const tsc=Math.max(1,P.latCell|0), tgap=Math.max(0,P.tile.gap|0), tst=Math.max(0,P.tile.stagger|0);
+  const tileDark=(cu,cv)=>{ const px=tk+tgap, py=th+tgap, ti=Math.floor(cu/px), cx=pmod(cu,px), cy=pmod(cv+ti*tst,py);
+    return cx<tk && cy<th && tm.rows[cy][cx]==="1"; };
+  /* "edge": chart columns = wall columns, chart rows = wall rows (× cell size), so a
+     chart diagonal — an eye's edge — IS a lattice diagonal, at whatever angle the
+     lattice has.  "rotated": chart axes along the two lattice directions (a 45°
+     turn of the motif; an eye becomes an upright square)                          */
+  /* chart column = v, chart row = u; a node step in u,v is spB/2 lattice units, so in flow a chart cell = latCell lattice diamonds */
+  const csR = tsc * (latFlow ? Math.max(1, spB/2) : 1);
+  /* a DRAWN motif (from lattice-editor): painted segments in lattice units,
+     repeated by two vectors a, b.  App node (c,r) → editor (i,j): i = c + shift
+     (the app's ±θ lattice starts half a pitch left of the editor's), j = r.    */
+  const drawn = latFlow && P.drawn && P.drawn.segs && P.drawn.segs.length ? P.drawn : null;
+  const dShift = drawn ? (drawn.kind==="vd" ? 0 : 1) : 0;
+  const dByDelta = new Map();                                  // "di,dj" → [[i1,j1],...] motif segment starts
+  if(drawn) for(const [i1,j1,i2,j2] of drawn.segs){ const k=(i2-i1)+","+(j2-j1); if(!dByDelta.has(k)) dByDelta.set(k,[]); dByDelta.get(k).push([i1,j1]); }
+  const dDet = drawn ? drawn.a[0]*drawn.b[1]-drawn.a[1]*drawn.b[0] : 0;
+  const darkSeg=(c1,r1,c2,r2)=>{                              // is the lattice segment (c1,r1)→(c2,r2) painted, modulo the repeat?
+    if(!drawn) return false;
+    const i1=c1+dShift, i2=c2+dShift, k=(i2-i1)+","+(r2-r1); const starts=dByDelta.get(k); if(!starts) return false;
+    for(const [si,sj] of starts){ const di=i1-si, dj=r1-sj;
+      if(dDet===0){ if(di%drawn.a[0]===0 && dj===0) return true; continue; }
+      const m=(di*drawn.b[1]-dj*drawn.b[0])/dDet, n=(drawn.a[0]*dj-drawn.a[1]*di)/dDet;
+      if(Math.abs(m-Math.round(m))<1e-6 && Math.abs(n-Math.round(n))<1e-6) return true; }
+    return false; };
+  /* which copy of the motif a painted segment belongs to: the (m,n) of the repeat */
+  const instOf=(c1,r1,c2,r2)=>{ if(!drawn) return null;
+    const i1=c1+dShift, i2=c2+dShift, k=(i2-i1)+","+(r2-r1); const starts=dByDelta.get(k); if(!starts) return null;
+    for(const [si,sj] of starts){ const di=i1-si, dj=r1-sj; if(dDet===0){ if(di%drawn.a[0]===0 && dj===0) return (di/drawn.a[0])+",0"; continue; }
+      const m=(di*drawn.b[1]-dj*drawn.b[0])/dDet, n=(drawn.a[0]*dj-drawn.a[1]*di)/dDet;
+      if(Math.abs(m-Math.round(m))<1e-6 && Math.abs(n-Math.round(n))<1e-6) return Math.round(m)+","+Math.round(n); }
+    return null; };
+  const dNodeCache=new Map();
+  const darkNodeDrawn=(c,r)=>{ const k=c+","+r; if(dNodeCache.has(k)) return dNodeCache.get(k);
+    const h = latVD ? spB : Math.max(1,Math.round(spB/2)); let v=false;
+    if(latVD){ v = darkSeg(c,r,c,r+h) || darkSeg(c,r,c+h,r+h); }
+    else { v = darkSeg(c,r,c+h,r+h) || darkSeg(c,r,c-h,r+h); }
+    dNodeCache.set(k,v); return v; };
+  const darkRot = drawn ? darkNodeDrawn : latVD
+    ? (c,r)=> tileDark(Math.floor(Math.floor(c/spB)/tsc), Math.floor(Math.floor((r-c)/spB)/tsc))          // chart column = vertical, chart row = diagonal
+    : (c,r)=> tileDark(Math.floor((r-c)/2/csR), Math.floor((c+r)/2/csR));
+  let flowMoves=0, flowPhi=null, sinkSheds=0;
+  /* share of the cables the segment below wants: a dark segment ~1, a light one a
+     small fraction (`flowLight`, the carrier line's own share); the look-ahead Φ
+     only tips the balance between two light or two dark segments               */
+  const flowW=(c,rr)=>{ const dark=darkRot(c,rr), phi=flowPhi ? flowPhi[rr*L.cols+c] : 0, lt=clamp(P.flowLight??0.04,0.005,0.5);
+    return dark ? 1 + 0.3*phi : lt*(1 + 0.3*phi); };
+  const sagMaxP = Math.max(0.001,(P.maxSag||40)/1000);
+  const okTurn=(nd,r,col,sinIn,sinOut,baseAt)=>{               // can node `col` take this direction change?
+    if(Math.abs(sinOut-sinIn)<1e-9) return true;
+    if(latFree && nd.isPattern) return true;
+    const F=tensionOf(nd,r)*Math.abs(sinOut-sinIn);
+    let k=0; for(const b of (baseAt.get(col)||[])) k += 2*(tensionOf(b,r)+P.netPre)/Lseg;
+    const shift = k>0 ? F/k : Infinity;
+    if(shift>sagMaxP) return false;
+    if(shift>maxNodeShift) maxNodeShift=shift; return true;
+  };
+  const patNext=(nd,r,baseAt)=>{
+    if(r===0){ nd.dirCur=nd.dir0; nd.sinCur=nd.dir0*sinT; nd.hop=null; nd.vertHold=0; return nd.c + (nd.band? nd.band.c0:0); }
+    let pc=nd.pcol; const want=nd.tcol; nd.hop=null;
+    if(nd.fly){ const f=nd.fly;
+      if(f.t===0){ const dxF=(f.c1-f.c0)*colPitch, sinF=dxF/Math.hypot(dxF, f.n*dy);
+        if(!okTurn(nd,r,pc,nd.sinCur,sinF,baseAt)){ patRefused++; nd.fly=null; nd.inFlight=false; const d=nd.fam||nd.dirCur; nd.dirCur=d; nd.sinCur=d*sinT; patD++;
+          const c2=pc+d*stepN; return (c2>=0 && c2<L.cols) ? c2 : pc-d*stepN; }
+        f.x0 = nd.path.length ? nd.path[nd.path.length-1] : mg+(pc+0.5)*colPitch; nd.sinCur=sinF; if(f.c1!==f.c0) nd.dirCur=Math.sign(f.c1-f.c0); patTurns++; patFly++; }
+      f.t++;
+      if(f.t<f.n){ nd.inFlight=true; return Math.round(f.c0 + f.t*(f.c1-f.c0)/f.n); }
+      nd.inFlight=false; const c1=f.c1; nd.fly=null; return c1; }
+    if(nd.vertHold>0){ nd.vertHold--; nd.sinCur=0; patV++; return pc; }          // finishing a two-row vertical
+    let sinIn=nd.sinCur;
+    /* horizontal hop along the row line to the next base node, if the chart wants to go far */
+    if(allowH && Math.abs(want-pc)>=hopW+1){
+      const sg=want>pc?1:-1, pc2=pc+sg*hopW;
+      if(pc2>=0 && pc2<L.cols && okTurn(nd,r,pc,sinIn,sg,baseAt)){ nd.hop=pc2; pc=pc2; sinIn=sg; patH++; }
+    }
+    /* descend: vertical if the chart wants to hold the column, else diagonal toward it */
+    let d = want>pc ? 1 : want<pc ? -1 : 0;
+    if(d===0 && allowV && !(holes && voidMask[r*L.cols+pc])){
+      if(okTurn(nd,r,pc,sinIn,0,baseAt)){ nd.sinCur=0; nd.vertHold=hopW-1; patV++; return pc; }
+    }
+    if(d===0) d = nd.dirCur;
+    if(mirror && voidMask[(r-1)*L.cols+pc]) d=-nd.dirCur;
+    if(pc+d*stepN<0 || pc+d*stepN>=L.cols) d=-d;
+    if(holes){
+      const cand=pc+d*stepN, blockedC = voidMask[r*L.cols+cand];
+      if(blockedC || !openAhead(cand,d,r+1,2)){
+        const alt=pc-d*stepN;
+        if(alt>=0 && alt<L.cols && !voidMask[r*L.cols+alt] && (openAhead(alt,-d,r+1,2) || blockedC)){ d=-d; figBounces++; }
+        else if(blockedC) passThrough++;
+      }
+    }
+    if(!okTurn(nd,r,pc,sinIn,d*sinT,baseAt)){
+      /* refused: keep the incoming direction if it is a diagonal, else fall back the way we lean */
+      patRefused++;
+      if(Math.abs(sinIn)>0.01 && Math.abs(sinIn)<0.999) d = sinIn>0?1:-1; else d = nd.dirCur;
+      if(pc+d*stepN<0 || pc+d*stepN>=L.cols) d=-d;
+      if(holes && voidMask[r*L.cols+pc+d*stepN]) passThrough++;
+    } else if(Math.abs(d*sinT-sinIn)>1e-9) patTurns++;
+    nd.dirCur=d; nd.sinCur=d*sinT; patD++;
+    return pc+d*stepN;
+  };
+  const railR = latVD ? allNodes.find(n=>n.rail==="R") : null;
+  const latNext=(nd,r)=>{
+    if(latVD){
+      if(r<nd.birth) return undefined;
+      if(r===nd.birth){ nd.dirCur = nd.vd==="d" ? 1 : 0; return nd.c; }
+      if(nd.vd==="v") return nd.tcol;
+      const c2=nd.tcol+stepN;
+      if(c2>=L.cols){ if(nd.cables.length){ for(const id of nd.cables){ railR.cables.push(id); cab[id].off=undefined; } nd.cables=[]; } nd.ended=true; return L.cols-1; }
+      return c2;
+    }
+    if(r===0){ nd.dirCur=nd.dir; return nd.c; }
+    const c=nd.tcol; let d=nd.dirCur;
+    if(mirror && !latPat && voidMask[(r-1)*L.cols+c]){ d=-d; mirrorTurns++; }   // a mirror node: flip, both families alike
+    let cand=c+d*stepN, rail=false;
+    if(cand<0||cand>=L.cols){ d=-d; cand=c+d*stepN; rail=true; }
+    const blocked=(x)=> x<0||x>=L.cols||voidMask[r*L.cols+x];
+    /* reflect at the figure — and turn one node early if going straight would
+       leave the strand with no legal step at the next row (a hole's wide row) */
+    if(holes && !latPat && !rail && (blocked(cand) || !openAhead(cand,d,r+1,2))){
+      const alt=c-d*stepN;
+      if(!blocked(alt) && (openAhead(alt,-d,r+1,2) || blocked(cand))){ d=-d; cand=alt; figBounces++;
+        const T=nd.cables.length*(Math.max(0,(maxD-r*dy))*1.08*(P.gpm/1000)+P.bulbMass/1000)*G; turnAt.push({r:r-1,col:c,dir:nd.dir,T}); }
+      else if(blocked(cand)) passThrough++; }
+    nd.dirCur=d; return cand;
+  };
   const active=allNodes;                                     // no forks in the loom model: the warp is fixed
 
   /* ── cable records ── */
@@ -725,12 +1169,20 @@ function generate(P){
   const corners=[]; let supportLimited=0, unsupported=0, ribCorners=0, maxAnchorGap=0, maxSag=0, ribBroken=0, railTies=0;
   /* ── weft: cables that travel across ── */
   const hops=[]; let weftRows=0, weftCables=0, weftLen=0, weftOver=0, weftOverCables=0, floatsDropped=0;
-  const weftOn = (P.weftEvery|0)>0, maxFloats=Math.max(1,P.weftMax|0);
+  const weftOn = (P.weftEvery|0)>0 && !lattice, maxFloats=Math.max(1,P.weftMax|0);
   const reserve=Math.max(0,P.reserve|0);
-  const keepsReserve=(nd,r)=> nd.structural && r<R-1 && nd.cables.length<=reserve;   // may not give a cable away now
+  if(latFlow){ flowPhi=new Float32Array(L.cols*(R+2)); const g=0.7, hN = latVD ? spB : Math.max(1,Math.round(spB/2));
+    if(drawn){ /* per node step: Φ(node) = mean over the two segments below of (painted ? 1 : 0) + g·Φ(child) */
+      for(let rr=R;rr>=0;rr--) for(let c=0;c<L.cols;c++){ let sum=0,n=0; for(const d of (latVD ? [0,1] : [-1,1])){ const c2=c+d*hN, r2=rr+hN; if(c2<0||c2>=L.cols) continue; n++;
+          sum += (darkSeg(c,rr,c2,r2)?1:0) + (r2<=R ? g*flowPhi[r2*L.cols+c2] : 0); } flowPhi[rr*L.cols+c] = n? sum/n : 0; } }
+    else for(let rr=R;rr>=0;rr--) for(let c=0;c<L.cols;c++){ const ch=[]; for(const d of (latVD ? [0,1] : [-1,1])){ const c2=c+d*stepN; if(c2>=0&&c2<L.cols) ch.push(flowPhi[(rr+1)*L.cols+c2]); }
+      flowPhi[rr*L.cols+c] = (darkRot(c,rr)?1:0) + (ch.length? g*ch.reduce((a,b)=>a+b,0)/ch.length : 0); } }
+  const keepsReserve=(nd,r)=> latFlow ? (nd.cables.length<=1 && r < Math.round(R*clamp(P.baseEnd??0.6,0.3,1)))   // flow: every lattice line keeps one cable until baseEnd
+                                        : (nd.isBase && latPat) ? (r < Math.round(R*clamp(P.baseEnd??0.6,0.3,1)))   // a base lattice under a pattern holds until baseEnd, then thins
+                                        : (nd.structural && r<R-1 && nd.cables.length<=reserve);   // may not give a cable away now
   let landedOnEnding=0;
   const ndIndex=new Map(); allNodes.forEach((nd,i)=>ndIndex.set(nd.id,i));
-  function doFloat(A,B,r,count){
+  function doFloat(A,B,r,count,force){
     const ia=ndIndex.get(A.id), ib=ndIndex.get(B.id);
     const xa=A.path[A.path.length-1], xb=B.path[B.path.length-1];
     let moved=0;
@@ -744,8 +1196,9 @@ function generate(P){
          shuttling back and forth low on the wall into 30 m cuts.              */
       let idx=-1, best=Infinity;
       for(let q=0;q<A.cables.length;q++){ const c=cab[A.cables[q]];
-        if(c.lastFloatRow===r || c.floats>=maxFloats) continue;
+        if(!force && (c.lastFloatRow===r || c.floats>=maxFloats)) continue;
         const h=c.hlen + rng()*0.02; if(h<best){best=h; idx=q;} }
+      if(idx<0 && force){ let hb=Infinity; for(let q=0;q<A.cables.length;q++){ const h=cab[A.cables[q]].hlen; if(h<hb){hb=h; idx=q;} } }   // replaying the plan: this float must happen
       if(idx<0) break;
       const id = A.cables.splice(idx,1)[0];
       cab[id].hlen += Math.abs(xb-xa); cab[id].floats++; cab[id].lastFloatRow=r;
@@ -759,6 +1212,7 @@ function generate(P){
       moved++;
     }
     if(moved){
+      (floatPlan[r] ||= []).push({a:A.id,b:B.id,n:moved});
       if(gridOn){ const ca=Math.round((xa-mg)/colPitch-0.5), cb=Math.round((xb-mg)/colPitch-0.5); for(let q=Math.min(ca,cb);q<Math.max(ca,cb)&&q<1024;q++) if(q>=0) colCov[q]+=moved; }
       const lo=Math.min(ia,ib), hi=Math.max(ia,ib);
       let over=0, overC=0; for(let q=lo+1;q<hi;q++){ over++; overC+=allNodes[q].cables.length; }
@@ -772,6 +1226,16 @@ function generate(P){
   const ribRow=new Float64Array(R+1).fill(-1);            // thinnest point of the rib at each row (-1 = no weft row)
   let ribsFull=0, ribMinSum=0, ribMeanSum=0;
   function weftRow(r){
+    if(replay){                                              // second pass: the same floats as the design pass
+      ribCov.fill(0); colCov.fill(0);
+      for(const f of (replay[r]||[])){ const A=allNodes[ndIndex.get(f.a)], B=allNodes[ndIndex.get(f.b)];
+        const m=doFloat(A,B,r,f.n,true);
+        if(m){ const ia=ndIndex.get(A.id), ib=ndIndex.get(B.id); for(let q=Math.min(ia,ib);q<Math.max(ia,ib);q++) ribCov[q]+=m; } }
+      let mn=Infinity, sum=0; for(let q=0;q<allNodes.length-1;q++){ if(ribCov[q]<mn) mn=ribCov[q]; sum+=ribCov[q]; }
+      ribRow[r]=isFinite(mn)?mn:0;
+      if(P.weftSpan==="wall"){ if(mn>=1) ribsFull++; ribMinSum+=mn; ribMeanSum+=sum/Math.max(1,allNodes.length-1); }
+      weftRows++; verifyRow(r); return;
+    }
     const k=Math.floor((r+(P.weftPhase|0))/P.weftEvery);
     const dirRight = (k%2)===0;
     const groups = P.weftSpan==="band" ? L.seq.filter(b=>!b.isGround).map(b=>b.strands) : [allNodes];
@@ -793,6 +1257,14 @@ function generate(P){
       if(dirRight){ for(let i0=-lead-off;i0<n-1;i0+=st){ const f=fl(), i=Math.max(0,i0); let j=land(Math.min(n-1,i0+f),1); if(j>i){ const m=doFloat(arr[i],arr[j],r,hopsN); if(m) for(let q=ndIndex.get(arr[i].id);q<ndIndex.get(arr[j].id);q++) ribCov[q]+=m; } else if(j<0) floatsDropped++; } }
       else        { for(let i0=n-1+lead+off;i0>0;i0-=st){ const f=fl(), i=Math.min(n-1,i0); let j=land(Math.max(0,i0-f),-1); if(j>=0&&j<i){ const m=doFloat(arr[i],arr[j],r,hopsN); if(m) for(let q=ndIndex.get(arr[j].id);q<ndIndex.get(arr[i].id);q++) ribCov[q]+=m; } else if(j<0) floatsDropped++; } }
     }
+    verifyRow(r);
+    /* continuity: is every cell between the first and last strand covered? */
+    let mn=Infinity, sum=0; for(let q=0;q<allNodes.length-1;q++){ if(ribCov[q]<mn) mn=ribCov[q]; sum+=ribCov[q]; }
+    ribRow[r]=isFinite(mn)?mn:0;
+    if(P.weftSpan==="wall"){ if(mn>=1) ribsFull++; ribMinSum+=mn; ribMeanSum+=sum/Math.max(1,allNodes.length-1); }
+    weftRows++;
+  }
+  function verifyRow(r){
     /* with edge rails the rib's first and last cables are tied to the wall: extend the coverage to the rails */
     if(gridOn && P.edgeRails && P.weftSpan!=="band"){
       let first=-1,last=-1; for(let q=0;q<L.cols;q++) if(colCov[q]){ if(first<0)first=q; last=q; }
@@ -803,20 +1275,167 @@ function generate(P){
       const lo=Math.max(0,cn.l), hi=Math.min(L.cols-1,cn.rr-1); let ok=true;
       for(let q=lo;q<=hi;q++) if(!colCov[q]){ ok=false; break; }
       if(!ok){ cn.by="none"; unsupported++; ribCorners--; ribBroken++; } }
-    /* continuity: is every cell between the first and last strand covered? */
-    let mn=Infinity, sum=0; for(let q=0;q<allNodes.length-1;q++){ if(ribCov[q]<mn) mn=ribCov[q]; sum+=ribCov[q]; }
-    ribRow[r]=isFinite(mn)?mn:0;
-    if(P.weftSpan==="wall"){ if(mn>=1) ribsFull++; ribMinSum+=mn; ribMeanSum+=sum/Math.max(1,allNodes.length-1); }
-    weftRows++;
+  }
+  /* ═══ ROUTE MODEL (drawn designs on the ±θ lattice, start every 2) ═══
+     The motif is tiled over the wall; every copy is cut into PATHS — monotone
+     runs of painted segments (a closed diamond is two paths). Then cables are
+     routed: "one" — a cable per path, brought from the beam by the cheapest
+     lattice route (plain segments cheap, other copies' segments dear, routes
+     already used dearer, so connectors stay thin and spread); "equal" — every
+     cable has the same length: it runs from the beam to a path, traces it, is
+     handed the nearest next path below it has budget for, and so on; what is
+     left of its length runs the plain lattice down before the bulb.           */
+  const routeMode = latFlow && drawn && !latVD && spB===2 && (P.routeMode==="one" || P.routeMode==="equal" || P.routeMode==="chain") ? P.routeMode : null;
+  const routePlans=[]; let routeStats=null;
+  if(routeMode){
+    const segLen=Math.hypot(colPitch,dy), cols=L.cols;
+    const nodeOK=(c,r)=> c>=0 && c<cols && r>=0 && r<=R && ((c+r)%2===0);
+    /* paths per copy */
+    const byInst=new Map();
+    for(let r=0;r<R;r++) for(let c=(r%2);c<cols;c+=2) for(const d of [-1,1]){ const c2=c+d; if(c2<0||c2>=cols) continue; const key=instOf(c,r,c2,r+1); if(key===null) continue;
+      if(!byInst.has(key)) byInst.set(key,[]); byInst.get(key).push([c,r,c2,r+1]); }
+    const paths=[];
+    for(const [key,edges] of byInst){
+      const outs=new Map(), ends=new Map();                  // vertex → out-edges ; vertex → paths ending there
+      const vk=(c,r)=>c+":"+r;
+      for(const e of edges){ const k=vk(e[0],e[1]); if(!outs.has(k)) outs.set(k,[]); outs.get(k).push(e); }
+      const verts=[...new Set(edges.flatMap(e=>[vk(e[0],e[1]),vk(e[2],e[3])]))].map(k=>k.split(":").map(Number)).sort((a,b)=>a[1]-b[1]||a[0]-b[0]);
+      for(const [c,r] of verts){ const k=vk(c,r); const oe=(outs.get(k)||[]).slice().sort((a,b)=>a[2]-b[2]); const inP=(ends.get(k)||[]);
+        for(const e of oe){ let pth=null; const want=e[2]-e[0];
+          const i=inP.findIndex(q=>q.lastDir===want); if(i>=0) pth=inP.splice(i,1)[0]; else if(inP.length) pth=inP.shift();
+          if(!pth){ pth={inst:key, nodes:[[c,r]], lastDir:0}; paths.push(pth); }
+          pth.nodes.push([e[2],e[3]]); pth.lastDir=want; const k2=vk(e[2],e[3]); if(!ends.has(k2)) ends.set(k2,[]); ends.get(k2).push(pth); }
+        ends.delete(k); }
+    }
+    for(const pth of paths){ pth.start=pth.nodes[0]; pth.end=pth.nodes[pth.nodes.length-1]; pth.len=pth.nodes.length-1; }
+    paths.sort((a,b)=>a.start[1]-b.start[1]||a.start[0]-b.start[0]);
+    /* lattice routing: cheapest monotone route, downward DP */
+    const usage=new Map(); const ek=(c,r,c2)=>c+":"+r+":"+c2;
+    const edgeCost=(c,r,c2)=> 1 + (darkSeg(c,r,c2,r+1)?3:0) + 0.5*(usage.get(ek(c,r,c2))||0);
+    const routeTo=(srcs, tgt)=>{                              // srcs: [[c,r],...] (same row), tgt [c,r] → column list from srcs' row to tgt row, or null
+      const r0=srcs[0][1], r1=tgt[1]; if(r1<r0) return null; const W2=cols;
+      const dist=[], par=[]; for(let r=r0;r<=r1;r++){ dist.push(new Float64Array(W2).fill(Infinity)); par.push(new Int16Array(W2).fill(-1)); }
+      for(const [c] of srcs) dist[0][c]=0;
+      for(let r=r0;r<r1;r++){ const i=r-r0; for(let c=0;c<W2;c++){ const dcur=dist[i][c]; if(dcur===Infinity) continue; for(const d of [-1,1]){ const c2=c+d; if(c2<0||c2>=W2) continue; const v=dcur+edgeCost(c,r,c2); if(v<dist[i+1][c2]){ dist[i+1][c2]=v; par[i+1][c2]=c; } } } }
+      if(dist[r1-r0][tgt[0]]===Infinity) return null;
+      const colsOut=new Array(r1-r0+1); let c=tgt[0]; for(let i=r1-r0;i>=0;i--){ colsOut[i]=c; c=par[i][c]; if(c<0 && i>0) return null; }
+      for(let i=0;i<colsOut.length-1;i++){ const kk=ek(colsOut[i],r0+i,colsOut[i+1]); usage.set(kk,(usage.get(kk)||0)+1); }
+      return colsOut; };
+    const tops=[]; for(let c=0;c<cols;c+=2) tops.push([c,0]);
+    const mkPlan=()=>({cols:[], end:0, len:0, paths:0});
+    const appendCols=(plan, colsSeg)=>{ if(!plan.cols.length) plan.cols.push(...colsSeg); else plan.cols.push(...colsSeg.slice(1)); plan.end=plan.cols.length-1; plan.len=plan.end*segLen; };
+    const nRoute=Math.max(0, N-baseNodes.length); let unserved=0, passes=0;
+    if(routeMode==="one"){
+      for(let k=0;k<nRoute && paths.length;k++){ const pth=paths[k%paths.length]; const plan=mkPlan();
+        const con=routeTo(tops, pth.start); if(!con){ unserved++; continue; } appendCols(plan, con); appendCols(plan, pth.nodes.map(q=>q[0])); plan.paths=1; routePlans.push(plan); }
+      passes=1;
+    } else {
+      const fixedBudget=Math.max(2, Math.floor(clamp(P.cableLen??9,1,40)/segLen)); let newLeft=nRoute; const active=[];
+      /* "chain": every new cable takes an end row from the bulb schedule (evenly spread by height), longest first so the deep ones get the most paths */
+      const rowPool=[]; if(routeMode==="chain"){ for(let rr=1;rr<=R;rr++) for(let q=0;q<shedCount[rr];q++) rowPool.push(rr); rowPool.sort((a,b)=>b-a); }
+      const nextBudget=()=> routeMode==="chain" ? (rowPool.length ? rowPool.shift() : 2) : fixedBudget;
+      const served=new Map();                                   // path index → cables tracing it
+      while(newLeft>0 && passes<50){ passes++; let usedNew=0;
+        for(let pi=0;pi<paths.length;pi++){ const pth=paths[pi]; const need=pth.len;
+          let best=null, bestCost=Infinity;
+          for(const pl of active){ const er=pl.end, ec=pl.cols[er]; const dr=pth.start[1]-er, dc=Math.abs(pth.start[0]-ec); if(dr<=0 || dc>dr || (dr-dc)%2) continue;
+            if(pl.budget-plan_len(pl) < dr+need) continue; const cost=dr+0.1*dc+ (served.get(pi)||0)*3; if(cost<bestCost){ bestCost=cost; best=pl; } }
+          if(best){ const con=routeTo([[best.cols[best.end], best.end]], pth.start); if(con){ appendCols(best, con); appendCols(best, pth.nodes.map(q=>q[0])); best.paths++; served.set(pi,(served.get(pi)||0)+1); continue; } }
+          if(newLeft>0 && (served.get(pi)||0)===passes-1){ const budget=nextBudget(); if(pth.start[1]+need>budget){ if(routeMode==="chain") rowPool.unshift(budget); continue; }
+            const con=routeTo(tops, pth.start); if(!con){ if(routeMode==="chain") rowPool.unshift(budget); continue; }
+            const plan=mkPlan(); plan.budget=budget; appendCols(plan, con); appendCols(plan, pth.nodes.map(q=>q[0])); plan.paths=1; active.push(plan); routePlans.push(plan); newLeft--; usedNew++; served.set(pi,(served.get(pi)||0)+1); }
+        }
+        if(!usedNew) break; }
+      for(let pi=0;pi<paths.length;pi++) if(!served.get(pi)) unserved++;
+      /* spend what is left of each cable's length on the plain lattice, straight on */
+      /* cables the paths did not use: straight from the beam to their scheduled row, spread across the width */
+      let tk=0; while(newLeft>0 && routeMode==="chain" && rowPool.length){ const budget=rowPool.shift(); const c0=tops[(tk*7)%tops.length][0]; tk++; const plan=mkPlan(); plan.budget=budget; appendCols(plan,[c0]); active.push(plan); routePlans.push(plan); newLeft--; }
+      for(const pl of active){ let left=(pl.budget??fixedBudget)-pl.end; let c=pl.cols[pl.end], r=pl.end, d=(pl.end>0 && pl.cols[pl.end]>pl.cols[pl.end-1])?1:-1;
+        while(left>0 && r<R){ let c2=c+d; if(c2<0||c2>=cols){ d=-d; c2=c+d; } pl.cols.push(c2); c=c2; r++; left--; } pl.end=pl.cols.length-1; pl.len=pl.end*segLen; }
+      function plan_len(pl){ return pl.end; }
+    }
+    const lens=routePlans.map(pl=>pl.len);
+    routeStats={mode:routeMode, instances:byInst.size, paths:paths.length, cables:routePlans.length, carrier:baseNodes.length, unserved, passes,
+      meanLen: lens.length? lens.reduce((a,b)=>a+b,0)/lens.length : 0, maxLen: lens.length? Math.max(...lens):0, minLen: lens.length? Math.min(...lens):0,
+      pathsPerCable: routePlans.length? routePlans.reduce((a,p)=>a+p.paths,0)/routePlans.length : 0};
   }
   const step = Math.max(1e-6, dy*Math.tan(clamp(P.maxAng,5,85)*Math.PI/180));
   const twA = P.twine*colPitch*0.5;
   for(let r=0;r<=R;r++){
-    /* ── A. targets from the chart ── */
+    /* ── A. targets from the chart (or the lattice formula) ── */
+    if(lattice && !latPat){
+      for(const nd of allNodes){ nd.tcol=latNext(nd,r); if(nd.tcol===undefined) continue;
+        if(r>0 && !latVD && (nd.tcol===0 || nd.tcol===L.cols-1) && nd.cables.length){ bounces++;
+          const T=nd.cables.length*(Math.max(0,(maxD-r*dy))*1.08*(P.gpm/1000)+P.bulbMass/1000)*G;
+          const th=Math.atan2(Math.max(1,P.latStep|0)*colPitch, dy); const pull=2*T*Math.sin(th); if(pull>maxRailPull) maxRailPull=pull; } }
+      if(routeMode && r===0){
+        /* AT THE BEAM (route model): one carrier cable per line, every routed
+           cable on the line its plan leaves along; the rest ride straight down */
+        const tops=allNodes.filter(n=>n.birth===0 && n.tcol!==undefined); const ids=[]; for(const nd of tops){ ids.push(...nd.cables); nd.cables=[]; } ids.sort((a,b)=>a-b);
+        let k=0; for(const nd of tops){ const id=ids[k++]; nd.cables.push(id); cab[id].plan=null; cab[id].anchorX=mg+(nd.tcol+0.5)*colPitch; }
+        const byStart=new Map(); for(const nd of tops){ const key=nd.tcol+":"+(nd.dir>0?1:-1); byStart.set(key,nd); }
+        for(const pl of routePlans){ if(k>=ids.length) break; const id=ids[k++]; const c0=pl.cols[0], d=(pl.cols.length>1 ? Math.sign(pl.cols[1]-c0) : 1)||1;
+          const nd=byStart.get(c0+":"+d) || byStart.get(c0+":"+(-d)); if(!nd){ k--; continue; } nd.cables.push(id); cab[id].plan=pl; cab[id].anchorX=mg+(c0+0.5)*colPitch; cab[id].off=undefined; }
+        while(k<ids.length){ const id=ids[k++]; const nd=tops[k%tops.length]; nd.cables.push(id); cab[id].plan=null; cab[id].anchorX=mg+(nd.tcol+0.5)*colPitch; }
+      } else if(latFlow && r===0){
+        /* AT THE BEAM: cables hang wherever the design needs them — each top start
+           gets a share by what its first segment runs into (painted: full share,
+           plain: the light share, both eased by the look-ahead), so a line that
+           starts into an empty band carries a cable or two, not a full bundle.  */
+        const tops=allNodes.filter(n=>n.birth===0 && !n.rail && n.tcol!==undefined);
+        const hN = latVD ? spB : Math.max(1,Math.round(spB/2)), lt=clamp(P.flowLight??0.04,0.005,0.5);
+        const wOf=(nd)=>{ const c=nd.tcol, c2 = latVD ? (nd.vd==="v" ? c : c+hN) : c+(nd.dirCur||nd.dir)*hN; const r2=Math.min(R,hN);
+          const phi=flowPhi ? flowPhi[r2*L.cols+clamp(c2,0,L.cols-1)] : 0; const dk = drawn ? darkSeg(c,0,c2,r2) : darkRot(clamp(c2,0,L.cols-1),r2);
+          return dk ? 1+0.3*phi : lt*(0.1+phi); };
+        const ws=tops.map(wOf), tot=ws.reduce((a,b)=>a+b,0); const ids=[]; for(const nd of tops){ ids.push(...nd.cables); nd.cables=[]; }
+        ids.sort((a,b)=>a-b); let k=0; const want=tops.map((nd,i)=>Math.max(1,Math.floor(ids.length*ws[i]/tot)));
+        let left=ids.length-want.reduce((a,b)=>a+b,0); for(let i=0; left>0; i=(i+1)%tops.length){ if(ws[i]>=Math.max(...ws)*0.5){ want[i]++; left--; } }
+        while(left<0){ const i=want.indexOf(Math.max(...want)); want[i]--; left++; }
+        tops.forEach((nd,i)=>{ for(let q=0;q<want[i];q++){ const id=ids[k++]; nd.cables.push(id); cab[id].anchorX = mg+(nd.tcol+0.5)*colPitch; cab[id].off=undefined; } });
+        for(const nd of tops) nd.cables.sort((a,b)=>a-b);
+      }
+      if(latFlow){
+        /* FLOW: the two lines meeting at a node pool their cables and part again
+           toward the pattern — the segment below that the chart wants dark takes
+           the share, the other keeps the single lattice cable.  The share also
+           looks ahead (Φ = discounted dark nodes reachable below), so cables are
+           routed toward figures before they are on them.                          */
+        const at=new Map();
+        for(const nd of allNodes){ if(!nd.cables.length || nd.tcol===undefined || nd.ended) continue; if(!at.has(nd.tcol)) at.set(nd.tcol,[]); at.get(nd.tcol).push(nd); }
+        if(latVD){ for(const nd of allNodes) if(nd.vd==="d" && r===nd.birth && nd.birth>0 && !at.has(0)) at.set(0,[]); for(const nd of allNodes) if(nd.vd==="d" && r===nd.birth && nd.birth>0 && !nd.cables.length){ const l=at.get(0)||[]; if(!l.includes(nd)) l.push(nd); at.set(0,l); } }
+        if(routeMode){
+          for(const [c,list] of at){ if(list.length!==2) continue; const [A,B]=list;
+            const nxtR=(nd)=>{ let c2=nd.tcol+nd.dirCur*stepN; if(c2<0) c2=-c2; if(c2>=L.cols) c2=2*(L.cols-1)-c2; return c2; };
+            const nA=nxtR(A), nB=nxtR(B); if(nA===nB) continue;
+            const pool=[...A.cables,...B.cables]; const toA=[], toB=[];
+            for(const id of pool){ const pl=cab[id].plan; const onA=A.cables.includes(id);
+              if(!pl || r+1>pl.end){ (onA?toA:toB).push(id); continue; }
+              const want=pl.cols[r+1]; if(want===nA) toA.push(id); else if(want===nB) toB.push(id); else (onA?toA:toB).push(id); }
+            if(toA.length!==A.cables.length){ flowMoves+=Math.abs(toA.length-A.cables.length); for(const id of pool) cab[id].off=undefined; }
+            A.cables=toA; B.cables=toB; }
+          for(const nd of allNodes) if(nd.cables.length && darkRot(nd.tcol,r)) raster[r*L.cols+nd.tcol]=1;
+        } else
+        for(const [c,list] of at){ if(list.length!==2) continue;
+          /* the next node along each line is half a start pitch away (a rail reflects it) */
+          const [A,B]=list; const hs = latVD ? spB : Math.max(1,Math.round(spB/2)), rn=Math.min(R,r+hs);   // node-to-node step: a whole pitch on V+D, half on ±θ
+          const nxt=(nd)=>{ if(latVD) return clamp(nd.vd==="v" ? nd.tcol : nd.tcol+stepN*hs, 0, L.cols-1);
+            let c2=nd.tcol+nd.dirCur*stepN*hs; if(c2<0) c2=-c2; if(c2>=L.cols) c2=2*(L.cols-1)-c2; return clamp(c2,0,L.cols-1); };
+          const segWt=(nd)=>{ const c2=nxt(nd); const lt=clamp(P.flowLight??0.04,0.005,0.5); const phi=flowPhi ? flowPhi[rn*L.cols+c2] : 0;
+            return darkSeg(nd.tcol,r,c2,rn) ? 1+0.3*phi : lt*(0.1+phi); };            // painted: takes the cables; plain: only what leads to a figure
+          const wa = drawn ? segWt(A) : flowW(nxt(A),rn), wb = drawn ? segWt(B) : flowW(nxt(B),rn);
+          const pool=A.cables.length+B.cables.length; if(pool<2) continue;
+          let na=Math.round(pool*wa/(wa+wb)); na=clamp(na,1,pool-1);
+          if(na>A.cables.length){ const k=na-A.cables.length; const mv=B.cables.splice(B.cables.length-k,k); for(const id of mv){ A.cables.push(id); cab[id].turns++; } flowMoves+=k; }
+          else if(na<A.cables.length){ const k=A.cables.length-na; const mv=A.cables.splice(A.cables.length-k,k); for(const id of mv){ B.cables.push(id); cab[id].turns++; } flowMoves+=k; }
+          for(const nd of list) for(const id of nd.cables) cab[id].off=undefined;              // re-pack the two bundles
+        }
+        for(const nd of allNodes) if(nd.cables.length && darkRot(nd.tcol,r)) raster[r*L.cols+nd.tcol]=1;
+      }
+    } else
     for(const b of L.seq){
       const bits=rowBits(b,r); const dark=[];
       for(let k=0;k<b.k;k++) if(bits[k]==="1") for(let d=0;d<b.dup;d++) dark.push(k*b.dup+d);
-      if(!b.isGround) for(const cidx of dark) raster[r*L.cols + b.c0 + cidx]=1;
+      if(!b.isGround && !rotFrame) for(const cidx of dark) raster[r*L.cols + b.c0 + cidx]=1;
       const n=b.strands.length, Dk=dark.length;
       /* monotone pickup: the j-th strand goes to the dark cell of matching rank */
       for(let j=0;j<n;j++){ const nd=b.strands[j]; if(Dk>0) nd.cell = dark[Math.min(Dk-1, Math.floor((j+0.5)*Dk/n))]; }
@@ -829,6 +1448,101 @@ function generate(P){
       }
       for(const nd of b.strands) nd.tcol = b.c0 + nd.cell;
     }
+    if(latPat && rotFrame && frame==="rotated"){
+      /* THE TILE LAYOUT, TURNED ONTO THE LATTICE.  A bundle of the + family
+         travels +θ: its chart column is v = (r−c)/2, its chart row u = (c+r)/2
+         (the − family the transpose).  Each tile row it takes the tile's own
+         pickup — j-th bundle of the band → dark cell of rank j — and realises
+         the move with lattice steps only: stay = one +θ step; along one way by
+         k = +θ then k −θ steps (the tile's run along the rib, now on the other
+         lattice direction).  Along the other way would run uphill once turned,
+         so that move is not made — the bundle stays on its line and the
+         transposed family draws those arms (or, with horizontal moves allowed,
+         it hops along the rib line to the next node).  Bundles on the ground
+         columns between the motifs never move — the tile's anchor columns.
+         A rail turns the bundle into the other family.                          */
+      const cs = tsc*(latFree ? spP : 1);                                                       // lattice steps per chart cell
+      const cellAt=(col,row)=> tileDark(Math.floor(col/cs), Math.floor(row/cs));
+      const pitchC = cs*(tk+tgap), inGap=(col)=> pmod(Math.floor(col/cs), tk+tgap) >= tk;
+      const strands=[]; for(const bb of L.seq) for(const nd of bb.strands){ nd._pc = r>0 ? nd.pcol : nd.c+bb.c0; strands.push(nd); }
+      for(let c=r%spP; c<L.cols; c+=spP) if(cellAt((r-c)/2,(c+r)/2)) raster[r*L.cols+c]=1;
+      if(r===0){ for(const nd of strands){ nd.tcol=nd._pc; nd.fam=nd.dir0||1; nd.fly=null; nd.inFlight=false; nd.chev=0; nd.hold=0; } }
+      else {
+        /* the tile's move "down one row, along k cells" becomes ONE straight cable
+           between two nodes — an off-grid interconnect: along one way it is the
+           segment to node (c + s(1−k), r + 1 + k) (k = 1: vertical, 2: steep),
+           along the other way the horizontal hop along the rib line.  The node
+           stiffness test (okTurn) still applies at the start of every segment.  */
+        const groups=new Map();
+        for(const nd of strands){ if(nd.fly) continue;                                                    // in flight: patNext carries it
+          if(nd.hold>0){ nd.hold--; nd.tcol=nd._pc+nd.fam; if(nd.tcol<0||nd.tcol>=L.cols){ nd.fam=-nd.fam; nd.tcol=nd._pc+nd.fam; } continue; }   // inside a cell: straight on
+          if(nd.chev>0){ nd.chev--; nd.tcol=nd._pc-nd.fam; if(nd.tcol<0||nd.tcol>=L.cols){ nd.chev=0; nd.tcol=nd._pc+nd.fam; } continue; }   // finishing a chevron: along the other lattice direction
+          const c=nd._pc, rr=r-1, u=(c+rr)/2, v=(rr-c)/2; const col = nd.fam>0 ? v : u, row = nd.fam>0 ? u : v;
+          if(inGap(col)){ nd.tcol=c+nd.fam; continue; }                                                  // anchor line: straight on
+          const key=nd.fam+":"+Math.floor(col/pitchC); if(!groups.has(key)) groups.set(key,[]); groups.get(key).push({nd,col,row}); }
+        for(const [key,list] of groups){
+          list.sort((a,b)=> a.col-b.col || a.nd.id-b.nd.id);
+          const n=list.length, lim=Math.max(1,P.maxStep|0);
+          for(let j=0;j<n;j++){ const {nd,col,row}=list[j], sgn=nd.fam, c=nd._pc;
+            const b0=Math.floor(col/pitchC)*pitchC; const dark=[]; for(let x=b0;x<b0+pitchC;x++) if(cellAt(x,row+1)) dark.push(x);
+            const Dk=dark.length; const tgt = Dk ? dark[Math.min(Dk-1,Math.floor((j+0.5)*Dk/n))] : col;
+            let k=Math.round((tgt-col)/cs); nd.hold=cs-1;                                           // moves are whole chart cells; the rest of the cell is straight
+            if(k>0){ k=Math.min(k,lim);
+              if(P.latMove==="chevron"){ nd.chev=k*cs; nd.tcol=c+sgn; continue; }                      // down one step, then k cells along the other direction
+              let c1=c+sgn*(cs-k*cs); while(k>0 && (c1<0 || c1>=L.cols)){ k--; c1=c+sgn*(cs-k*cs); }
+              if(k>0){ nd.hold=0; nd.fly={t:0, n:cs+k*cs, c0:c, c1, x0:null}; nd.tcol=c1; continue; } }   // one straight segment for "down a cell, along k cells"
+            else if(k<0 && allowH){ nd.tcol=c+(hopW+1)*sgn; continue; }                                 // hop one cell along the rib line, then down
+            nd.tcol=c+sgn;
+          }
+        }
+        for(const nd of strands){ if((nd.fly && nd.fly.t>0) || nd.chev>0 || nd.hold>0) continue; const pc=nd._pc;
+          if(nd.tcol===pc+nd.fam && (nd.tcol<0 || nd.tcol>=L.cols)){ nd.fam=-nd.fam; nd.tcol=pc+nd.fam; }                     // rail: other family
+          else if(Math.abs(nd.tcol-pc)===hopW+1 && (nd.tcol<0 || nd.tcol>=L.cols)) nd.tcol=pc+nd.fam; }                              // no room for the hop
+      }
+    } else if(latPat && rotFrame){
+      /* edge following for the 1-step lattice-frame charts (frame "edge"): a
+         bundle that can reach a dark node takes it, a vertex is a turn, and where
+         both or neither are dark the rank pickup within the motif tile decides */
+      const px=tsc*(tk+tgap), py=tsc*(th+tgap);
+      const tileOf=(c)=> Math.floor((r-c)/2/px)+":"+Math.floor((c+r)/2/py);
+      const strands=[]; for(const bb of L.seq) for(const nd of bb.strands){ nd._pc = r>0 ? nd.pcol : nd.c+bb.c0; strands.push(nd); }
+      strands.sort((a,b)=> a._pc-b._pc || a.id-b.id);
+      const darkC=[]; for(let c=r%spB; c<L.cols; c+=spB) if(darkRot(c,r)){ darkC.push(c); raster[r*L.cols+c]=1; }
+      /* the tile's anchor columns: a bundle travelling +θ on a gap column of the chart keeps to it */
+      const onAnchor=(c,rr,dir)=> dir>0 && tgap>0 && pmod(Math.floor((rr-c)/2/tsc), tk+tgap) >= tk;
+      const groups=new Map();
+      for(const nd of strands){ const g=tileOf(nd._pc); if(!groups.has(g)) groups.set(g,[]); groups.get(g).push(nd); }
+      for(const [g,list] of groups){
+        const dk = darkC.filter(c=> tileOf(c)===g);
+        const n=list.length, Dk=dk.length;
+        for(let j=0;j<n;j++){ const nd=list[j], pc=nd._pc;
+          if(r===0){ nd.tcol=pc; continue; }
+          const d=nd.dirCur||nd.dir0||1, st=pc+d*stepN, tn=pc-d*stepN;
+          const okSt = st>=0 && st<L.cols, okTn = tn>=0 && tn<L.cols;
+          if(onAnchor(pc,r-1,d) && okSt){ nd.tcol=st; continue; }
+          if(P.latWarp==="feed" && d<0 && okSt){ nd.tcol=st; continue; }        // a feeder: straight −θ until the rail turns it into a warp bundle
+          const dSt = okSt && darkRot(st,r), dTn = okTn && darkRot(tn,r);
+          /* the tile pickup decides — j-th bundle of the tile → j-th dark node — and
+             a dark neighbour is taken only when the rank points that way; bundles
+             that met on a node so part again below it instead of merging for good */
+          const rank = Dk>0 ? dk[Math.min(Dk-1, Math.floor((j+0.5)*Dk/n))] : (okSt? st : tn);
+          if(dSt && dTn && rng()<P.latTurn) nd.tcol = tn;                // a vertex: turn with this share (1 = hug every side, 0 = the rank decides)
+          else if(rank===st || rank===tn) nd.tcol = rank;
+          else { const side = rank<pc ? Math.min(st,tn) : Math.max(st,tn), other = side===st ? tn : st;
+                 const dSide = side===st ? dSt : dTn, dOther = side===st ? dTn : dSt;
+                 nd.tcol = (dSide || !dOther || Dk===0) ? side : (Math.abs(rank-pc)<=stepN+spB ? other : side); }
+        }
+      }
+    }
+    if(latPat){
+      /* base first (their positions give each node its stiffness), then the pattern along the edges */
+      const baseAt=new Map();
+      for(const nd of baseNodes){ nd.tcol=latNext(nd,r);
+        if(r>0 && (nd.tcol===0 || nd.tcol===L.cols-1) && nd.cables.length){ bounces++;
+          const pull=2*tensionOf(nd,r)*Math.sin(thL); if(pull>maxRailPull) maxRailPull=pull; }
+        if(nd.cables.length){ const key = r>0 ? nd.pcol : nd.tcol; if(!baseAt.has(key)) baseAt.set(key,[]); baseAt.get(key).push(nd); } }
+      for(const bb of L.seq) for(const nd of bb.strands) nd.tcol=patNext(nd,r,baseAt);
+    }
     /* ── B. support on the grid: no corner in mid-air ──
        A column is ANCHORED at this row if a strand with cables arrives there
        vertically (it does not move this row). A corner is supported if it is on
@@ -836,7 +1550,7 @@ function generate(P){
        close enough that the rib's sag stays within the allowed sag. Moves whose end corner cannot be supported are
        shortened back toward the strand's own column.                         */
     const ribHere = gridOn && weftOn && r>0 && ((r+(P.weftPhase|0)) % P.weftEvery)===0;
-    if(gridOn){
+    if(gridOn && !lattice){
       const lim=Math.max(1,P.maxStep|0);
       for(const nd of allNodes) if(nd.pcol!==undefined) nd.tcol = nd.pcol + clamp(nd.tcol-nd.pcol, -lim, lim);
       const anch=new Uint8Array(L.cols);
@@ -883,7 +1597,7 @@ function generate(P){
     }
     /* ── C. place ── */
     const groups=new Map();
-    for(const nd of allNodes){ const key = gridOn ? nd.tcol : (nd.band.id+":"+nd.cell); if(!groups.has(key)) groups.set(key,[]); groups.get(key).push(nd); }
+    for(const nd of allNodes){ if(nd.tcol===undefined || (latVD && r<nd.birth)) continue; const key = gridOn ? nd.tcol : (nd.band.id+":"+nd.cell); if(!groups.has(key)) groups.set(key,[]); groups.get(key).push(nd); }
     for(const [key,list] of groups){
       const m=list.length, sp = (!gridOn && m>1) ? Math.min(colPitch*0.6/(m-1), colPitch*0.3) : 0;
       list.forEach((nd,i)=>{
@@ -892,14 +1606,26 @@ function generate(P){
                        : mg + (b.c0+nd.cell+0.5)*colPitch + (i-(m-1)/2)*sp;
         const prev = nd.path.length? nd.path[nd.path.length-1] : null;
         const w=bw(nd.cables.length), nc=nd.cables.length, y=r*dy;
+        if(gridOn && nd.isPattern && nd.inFlight && nd.fly){ const f=nd.fly, x1=mg+(f.c1+0.5)*colPitch;
+          x = f.x0 + (x1-f.x0)*f.t/f.n; nd.path.push(x); nd.count.push(nc); nd.pcol=nd.tcol; return; }
         if(gridOn){
           x = clamp(x, mg+w/2, W-mg-w/2);
           nd.path.push(x); nd.count.push(nc);
+          if(nd.isPattern && nd.hop!==null && nd.hop!==undefined) nd.pcol=nd.hop;
           const moved = nd.pcol!==undefined && nd.tcol!==nd.pcol;
           const slot=(k)=>{ const c=cab[nd.cables[k]]; if(c.off===undefined) c.off = nc>1?((k/(nc-1))-0.5)*w:0; return c.off; };
-          if(moved){ const lane = x>prev ? -P.laneOff : P.laneOff; runCells+=Math.abs(nd.tcol-nd.pcol); runs++; runLen+=Math.abs(x-prev);
+          if(nd.isPattern && nd.hop!==null && nd.hop!==undefined && prev!==null){        // horizontal hop at the previous row, node to node
+            const xh = mg+(nd.hop+0.5)*colPitch, yh=(r-1)*dy;
+            for(let k=0;k<nc;k++){ const off=slot(k); cab[nd.cables[k]].pts.push(xh+off, yh); }
+            nd.path[nd.path.length-1]=xh;                                                   // the strand's tie moved along the row
+            latHops.push({r:r-1, y:yh, xa:prev, xb:xh, a:nd.id, b:nd.id, n:nc, over:0});
+          }
+          const prevX = (nd.isPattern && nd.hop!==null && nd.hop!==undefined) ? mg+(nd.hop+0.5)*colPitch : prev;
+          if(moved || (nd.isPattern && nd.hop!=null)){ const lane = x>prevX ? -P.laneOff : P.laneOff; runCells+=Math.abs(nd.tcol-nd.pcol); runs++; runLen+= diag ? Math.hypot(x-prevX,dy)-dy : Math.abs(x-prevX);
             for(let k=0;k<nc;k++){ const off=slot(k);
-              cab[nd.cables[k]].pts.push(prev+off, y+lane, x+off, y+lane); cab[nd.cables[k]].node=nd.id; } }
+              if(diag) cab[nd.cables[k]].pts.push(x+off, y);                                    // straight cable between the two ties
+              else cab[nd.cables[k]].pts.push(prevX+off, y+lane, x+off, y+lane);
+              cab[nd.cables[k]].node=nd.id; } }
           else for(let k=0;k<nc;k++){ const off=slot(k); cab[nd.cables[k]].pts.push(x+off, y); cab[nd.cables[k]].node=nd.id; }
           nd.pcol = nd.tcol;
         } else {
@@ -917,6 +1643,14 @@ function generate(P){
     }
     /* weft row? cables travel across, then belong to the strand they landed on */
     if(weftOn && r>0 && ((r+(P.weftPhase|0)) % P.weftEvery)===0) weftRow(r);
+    /* lattice: the two families meet AT the nodes — count each tied crossing there */
+    if(lattice && r>0){
+      const byCol=new Map();
+      for(const nd of allNodes) if(nd.cables.length && !nd.inFlight){ const c=nd.tcol; if(!byCol.has(c)) byCol.set(c,[]); byCol.get(c).push(nd); }
+      for(const [c,list] of byCol){ const R1=list.filter(n=>n.dir>0), L1=list.filter(n=>n.dir<0), Pp=list.filter(n=>n.isPattern);
+        for(const a of R1) for(const b of L1){ crossings.push({r, x:mg+(c+0.5)*colPitch, y:r*dy, a:a.id, b:b.id, na:a.cables.length, nb:b.cables.length}); cableCross+=a.cables.length*b.cables.length; }
+        for(const p2 of Pp) for(const b of R1.concat(L1)){ crossings.push({r, x:mg+(c+0.5)*colPitch, y:r*dy, a:p2.id, b:b.id, na:p2.cables.length, nb:b.cables.length}); cableCross+=p2.cables.length*b.cables.length; } }
+    }
     /* crossings between row r-1 and r */
     if(r>0){
       const seg=[]; let maxMove=0;
@@ -934,7 +1668,7 @@ function generate(P){
           const sj=seg[j], da=sj.a-si.a, db=si.b-sj.b;
           if(da>1e-6 && db>1e-6){
             const t=da/(da+db);
-            crossings.push({r, x:si.a+(si.b-si.a)*t, y: gridOn? r*dy : (r-1)*dy+t*dy, a:si.nd.id, b:sj.nd.id,
+            crossings.push({r, x:si.a+(si.b-si.a)*t, y: (gridOn && !diag)? r*dy : (r-1)*dy+t*dy, a:si.nd.id, b:sj.nd.id,
                             na:si.nd.cables.length, nb:sj.nd.cables.length});
             cableCross += si.nd.cables.length*sj.nd.cables.length;
           }
@@ -942,49 +1676,111 @@ function generate(P){
       }
     }
     /* shed cables → bulbs */
-    let need = shedCount[r]; if(r===0) need=0;
-    while(need>0){
-      /* never empty a structural reserve early, and never empty a strand in the
-         row a run just landed on it — its corner needs the column below       */
-      const pool = active.filter(n=>n.cables.length>0 && !keepsReserve(n,r) && !(n.landedRow===r && n.cables.length<=1));
-      if(!pool.length) break;
-      let cum=0; const cw=[];
-      for(const n of pool){ cum+=n.cables.length; cw.push(cum); }
-      let best=null, bestD=-1;
-      const tries = Math.min(P.bnTries, Math.max(1, pool.length*2));
-      const gapM = (P.minGap||0)/1000;
-      for(let batch=0; batch<4 && bestD<gapM; batch++)
-      for(let t=0;t<tries;t++){
-        const v=rng()*cum; let lo=0,hi=cw.length-1;
-        while(lo<hi){const m=(lo+hi)>>1; if(cw[m]<=v)lo=m+1;else hi=m;}
-        const nd=pool[lo], n=nd.cables.length;
-        const side = rng()<0.5 ? 0 : n-1;
-        const w=bw(n), cs=cab[nd.cables[side]];
-        const off = gridOn && cs.off!==undefined ? cs.off : (n>1?((side/(n-1))-0.5)*w:0);
-        const x = nd.path[nd.path.length-1]+off;
-        const y = clamp(r*dy + tLo[r] + rng()*(tHi[r]-tLo[r]), 0, H);
-        const d = minDist(x,y);
-        if(d>bestD){bestD=d; best={nd,side,x,y};}
+    plan[r]=new Map();
+    /* which strand holds each column this row (for drop runs) */
+    const colStrand = gridOn ? new Array(L.cols).fill(null) : null;
+    if(gridOn) for(const nd of active) if(nd.cables.length && (!colStrand[nd.tcol] || colStrand[nd.tcol].cables.length<nd.cables.length)) colStrand[nd.tcol]=nd;
+    const canHang=(nd)=> nd.cables.length>=2 || (nd.structural && nd.cables.length>=1);
+    const candidate=(nd,sideIdx)=>{                           // one random way for a cable of nd to drop (or a given cable)
+      const n=nd.cables.length, side = sideIdx!==undefined ? sideIdx : (rngB()<0.5 ? 0 : n-1);
+      const w=bw(n), cs=cab[nd.cables[side]];
+      const off = gridOn && cs.off!==undefined ? cs.off : (n>1?((side/(n-1))-0.5)*w:0);
+      let x = nd.path[nd.path.length-1]+off, tie=null;
+      if(gridOn && !lattice && P.bulbDrift>0 && rngB()<P.bulbDrift){
+        /* run along the rib and hang from any point of it — a rib is a tensioned
+           horizontal, so the tie can be anywhere along it, not only at a column */
+        const reach=Math.max(1,P.bulbReach|0), dir=rngB()<0.5?-1:1;
+        const xt = clamp(x + dir*(0.15+rngB()*(reach-0.15))*colPitch, mg+0.01, W-mg-0.01);
+        const c0=nd.tcol, c1=clamp(Math.round((xt-mg)/colPitch-0.5),0,L.cols-1);
+        let onRib=true; for(let q=Math.min(c0,c1); q<=Math.max(c0,c1); q++) if(!colCov[q]){ onRib=false; break; }
+        if(onRib){ x=xt; tie="rib"; }
+        else { const t=colStrand[c1]; if(t && t!==nd && canHang(t)){ tie=t; x = mg+(c1+0.5)*colPitch + (dir>0 ? -bw(t.cables.length)/2 : bw(t.cables.length)/2); } }
       }
-      if(!best) break;
-      const {nd,side,x,y}=best;
-      const id = nd.cables.splice(side,1)[0];
-      const c = cab[id];
-      c.shedRow=r; c.bx=x; c.by=y; c.tail=y-r*dy;
-      c.pts[c.pts.length-2]=x; c.pts.push(x,y);
+      const y = clamp(r*dy + tLo[r] + rngB()*(tHi[r]-tLo[r]), 0, H);
+      return {nd,side,x,y,tie};
+    };
+    const pickBest=(gen,tries)=>{ let best=null,bestD=-1; const gapM=(P.minGap||0)/1000;
+      for(let batch=0;batch<8&&bestD<gapM;batch++) for(let t=0;t<tries;t++){ const cnd=gen(); if(!cnd) continue; const d=minDist(cnd.x,cnd.y); if(d>bestD){bestD=d;best=cnd;} }
+      return best; };
+    const commit=(b)=>{
+      const {nd,side,x,y,tie}=b;
+      const id = nd.cables.splice(side,1)[0]; const c=cab[id];
+      c.shedRow=r; c.bx=x; c.by=y; c.tail=y-r*dy; c.inFig = !!(figRows && voidMask[r*L.cols+nd.tcol]);
+      if(tie){ const x0=c.pts[c.pts.length-2]; c.pts.push(x, r*dy); c.drop=Math.abs(x-x0); dropRuns++; dropLen+=c.drop; if(tie!=="rib") tie.landedRow=r; }   // along the row to the tie, then plumb
+      else c.pts[c.pts.length-2]=x;
+      c.pts.push(x,y);
       bulbs.push([x,y,id]); grid[gi(x,y)].push([x,y,id]);
-      need--;
+      plan[r].set(nd.id,(plan[r].get(nd.id)||0)+1);
+    };
+    if(routeMode){
+      for(const nd of active){ if(!nd.cables.length) continue;
+        const ending = nd.cables.filter(id=>{ const pl=cab[id].plan; return (pl && pl.end===r) || (r===R); });
+        for(const id of ending){ const idx=nd.cables.indexOf(id); if(idx<0) continue; const b=pickBest(()=>candidate(nd,idx), Math.max(4,P.bnTries|0)); if(b) commit(b); } }
+    } else if(planIn){
+      const pr=planIn.rows[r];
+      if(pr) for(const nd of active){ const k=pr.get(nd.id)||0; for(let i=0;i<k && nd.cables.length;i++){ const b=pickBest(()=>candidate(nd), Math.max(4,P.bnTries|0)); if(b) commit(b); } }
+    } else {
+      let need = shedCount[r]; if(r===0) need=0;
+      /* SINKS (drawn designs): a line whose next segment is plain, at a node with
+         no painted way down, is where a figure ends — a cable cannot stop there,
+         so it either runs the plain lattice to the next figure or becomes a bulb
+         here.  With `shed at sinks` the bundle drops all but what the look-ahead
+         says the next figure needs; those bulbs come off this row's budget.      */
+      if(latFlow && drawn && r>0 && (P.flowSink??true)){
+        /* the row's bulb budget goes to the sinks first (largest excess first), so
+           the bulb spread over height is kept; what the budget cannot take runs on */
+        const hN = latVD ? spB : Math.max(1,Math.round(spB/2)); const sinks=[];
+        for(const n of active){ if(n.cables.length<2 || n.dirCur===undefined || n.tcol===undefined) continue;
+          const c=n.tcol, c2 = latVD ? (n.vd==="v" ? c : c+hN) : c+n.dirCur*hN; if(c2<0||c2>=L.cols) continue;
+          if(darkSeg(c,r,c2,r+hN)) continue;
+          const alt = latVD ? (darkSeg(c,r,c,r+hN)||darkSeg(c,r,c+hN,r+hN)) : (darkSeg(c,r,c+hN,r+hN)||darkSeg(c,r,c-hN,r+hN)); if(alt) continue;
+          const phi = flowPhi ? flowPhi[Math.min(R,r+hN)*L.cols+c2] : 0; const keep=Math.max(1, Math.round(n.cables.length*clamp(0.35*phi,0.05,1)));
+          if(n.cables.length>keep) sinks.push({n, excess:n.cables.length-keep}); }
+        sinks.sort((a,b)=>b.excess-a.excess);
+        let budget=Math.round(need*clamp(P.sinkBoost??1,1,2)), sunk=0;
+        while(budget>0 && sinks.length){ let any=false; for(const sk of sinks){ if(budget<=0) break; if(sk.excess<=0 || sk.n.cables.length<2) continue;
+            const b=pickBest(()=>candidate(sk.n), Math.max(4,P.bnTries|0)); if(!b) continue; commit(b); sk.excess--; budget--; sunk++; any=true; } if(!any) break; }
+        need=Math.max(0, need-sunk); sinkSheds+=sunk;
+      }
+      while(need>0){
+        /* never empty a structural reserve early, and never empty a strand in the
+           row a run just landed on it — its corner needs the column below       */
+        const pool = active.filter(n=>n.cables.length>0 && !keepsReserve(n,r) && !(n.landedRow===r && n.cables.length<=1));
+        if(!pool.length) break;
+        let cum=0; const cw=[];
+        for(const n of pool){ const inFig = densFig && !n.isBase && voidMask[r*L.cols+n.tcol];
+          let wgt = n.cables.length*(inFig? densK : 1);
+          if(latFlow){ let onDark = raster[r*L.cols+n.tcol]===1;
+            let forced=false;
+            if(drawn && n.dirCur!==undefined){ const hN = latVD ? spB : Math.max(1,Math.round(spB/2)); const c2 = latVD ? (n.vd==="v" ? n.tcol : n.tcol+hN) : n.tcol+n.dirCur*hN; onDark = darkSeg(n.tcol,r,c2,r+hN);
+              if(!onDark){ const alt = latVD ? (darkSeg(n.tcol,r,n.tcol,r+hN)||darkSeg(n.tcol,r,n.tcol+hN,r+hN)) : (darkSeg(n.tcol,r,n.tcol+hN,r+hN)||darkSeg(n.tcol,r,n.tcol-hN,r+hN)); forced=!alt; } }
+            wgt = Math.max(0.01, n.cables.length-1) * (onDark ? 1 : forced ? 12 : 4) * (n.rail==="R" ? 8 : 1); }   // plain segments shed first; the right rail sheds what the diagonals hand it
+          cum+=wgt; cw.push(cum); }
+        const tries = Math.min(P.bnTries, Math.max(1, pool.length*2));
+        const b=pickBest(()=>{ const v=rngB()*cum; let lo=0,hi=cw.length-1; while(lo<hi){const m=(lo+hi)>>1; if(cw[m]<=v)lo=m+1;else hi=m;} return candidate(pool[lo]); }, tries);
+        if(!b) break;
+        commit(b); need--;
+      }
     }
     /* the screenshot case: a run landed on a strand whose column ends at this very row */
     if(r<R) for(const h of hops) if(h.r===r){ const B=allNodes[ndIndex.get(h.b)]; if(B.cables.length===0) landedOnEnding++; }
   }
   for(const nd of active) while(nd.cables.length){
     const id=nd.cables.pop(), c=cab[id];
-    const x=nd.path[nd.path.length-1], y=clamp(R*dy+tLo[R]+rng()*(tHi[R]-tLo[R]),0,H);
+    const off = (gridOn && c.off!==undefined) ? c.off : 0;
+    const x=nd.path[nd.path.length-1]+off, y=clamp(R*dy + Math.max(tLo[R], (tHi[R]-tLo[R])>1e-6 ? tLo[R]+rngB()*(tHi[R]-tLo[R]) : -rngB()*dy*0.6),0,H);
     c.shedRow=R; c.bx=x; c.by=y; c.tail=y-R*dy; c.pts.push(x,y);
     bulbs.push([x,y,id]); grid[gi(x,y)].push([x,y,id]);
   }
 
+  /* figure turns: a + and a − strand turning at the same node cancel; the rest pull the node sideways */
+  if(lattice && turnAt.length){
+    const m=new Map(); for(const t of turnAt){ const key=t.r+":"+t.col; const e=m.get(key)||{p:0,n:0,Tp:0,Tn:0}; if(t.dir>0){e.p++;e.Tp+=t.T;} else {e.n++;e.Tn+=t.T;} m.set(key,e); }
+    const th=Math.atan2(stepN*colPitch,dy), Lseg=Math.hypot(stepN*colPitch,dy);
+    for(const e of m.values()){ const net=Math.abs(e.Tp-e.Tn)*2*Math.sin(th); if(e.p!==e.n){ unbalanced++; if(net>maxUnbalPull) maxUnbalPull=net;
+      /* the node hangs on ~4 tensioned diagonals: lateral stiffness ≈ 4T/L */
+      const Tn=Math.max(1,(e.Tp+e.Tn)/Math.max(1,e.p+e.n)); const dlt=net*Lseg/(4*Tn); if(dlt>maxUnbalShift) maxUnbalShift=dlt; } }
+  }
   /* ── lengths & turns ── */
   let totLen=0, minL=Infinity, maxL=0, turnsTot=0, turnsMax=0;
   for(const c of cab){
@@ -1095,8 +1891,14 @@ function generate(P){
           hops, weftRows, weftCables, weftLen, weftOver, weftOverCables,
           ribsFull, ribRow, ribMinMean: weftRows? ribMinSum/weftRows : 0, ribThick: weftRows? ribMeanSum/weftRows : 0,
           floatsMax: cab.reduce((m,c)=>Math.max(m,c.floats),0), neverFloat: cab.filter(c=>!c.floats).length,
-          gridOn, gridCols, compOverflow, runCells, runs, runLen,
+          gridOn, gridCols, compOverflow, runCells, runs, runLen, diag, rowPitch, lattice, bounces, maxRailPull,
+          voidMask, holes, mirror, mirrorTurns, densFig, figBounces, passThrough, unbalanced, maxUnbalPull, maxUnbalShift,
+          latPat, baseN: baseNodes.length, baseCables: baseNodes.reduce((a,n)=>a+n.count[0],0), patTurns, patRefused, patFly, flowMoves, sinkSheds, latFlow, routeStats, maxNodeShift,
+          patV, patH, patD, latHops, latAngleSet: P.latAngle,
+          bulbsInFig: cab.filter(c=>c.inFig).length, figCells: (()=>{let k=0; for(let i=0;i<voidMask.length;i++) k+=voidMask[i]; return k/voidMask.length;})(), turnNodes: lattice? new Set(turnAt.map(t=>t.r+":"+t.col)).size : 0,
+          latAngle: Math.atan2(Math.max(1,P.latStep|0)*colPitch, dy)*180/Math.PI,
           corners, supportLimited, unsupported, ribCorners, maxAnchorGap, floatsDropped, maxSag, ribBroken, railTies,
+          plan, floatPlan, dropRuns, dropLen, bulbSeed,
           landedOnEnding, structuralN: allNodes.filter(n=>n.structural).length,
           structuralToBottom: allNodes.filter(n=>n.structural && n.count[R-1]>0).length,
           jam,jamY,jamX,jamBins,binW:W/NBIN, sliceCV,sliceLo,sliceHi,peakCov,peakRow,
@@ -1129,10 +1931,9 @@ function draw(){
   const fg = polarity? "#0d0b09" : "#efe9de";
   ctx.setTransform(1,0,0,1,0,0);
   ctx.fillStyle=bg; ctx.fillRect(0,0,cv.width,cv.height);
-  if(showGrid && D.gridOn && view!=="density") drawBaseGrid();
+  if(showGrid && D.gridOn) drawBaseGrid();
   const lw = Math.max(0.35, D.dia*scale)*gain;
-  if(view==="density"){ drawDensity(bg,fg,lw); }
-  else if(view==="bulbs"){ drawBulbs(bg,fg); }
+  if(view==="bulbs"){ drawBulbs(bg,fg); }
   else if(view==="tech"){ drawTech(bg,fg,lw); }
   else { drawWeave(fg,lw,true); }
 }
@@ -1164,8 +1965,16 @@ function strokeCables(colour,lw,alpha){
   }
   ctx.stroke(); ctx.globalAlpha=1;
 }
+/* flow: the carrier lattice — every line the cables ride — as a 1 px blue line over the cables */
+function drawCarrier(){
+  if(!D.latFlow) return;
+  ctx.save(); ctx.setTransform(1,0,0,1,0,0); ctx.lineWidth=1; ctx.strokeStyle = polarity? "#1a5fd6" : "#6fa8ff"; ctx.globalAlpha=1; ctx.beginPath();
+  for(const nd of D.nodes){ for(let i=0;i<nd.path.length;i++){ const X=nd.path[i]*scale, Y=(nd.birth+i)*D.dy*scale; if(i===0) ctx.moveTo(X,Y); else ctx.lineTo(X,Y); } }
+  ctx.stroke(); ctx.restore();
+}
 function drawWeave(fg,lw,withBulbs){
   strokeCables(fg,lw,0.92);
+  drawCarrier();
   if(withBulbs){
     const r=Math.max(1.1, 0.012*scale);
     ctx.fillStyle = polarity? "#c8892a" : "#ffd98a";
@@ -1173,12 +1982,6 @@ function drawWeave(fg,lw,withBulbs){
     for(const b of D.bulbs){ ctx.moveTo(b[0]*scale+r,b[1]*scale); ctx.arc(b[0]*scale,b[1]*scale,r,0,6.2832); }
     ctx.fill();
   }
-}
-function drawDensity(bg,fg,lw){
-  ctx.save();
-  ctx.filter = blurPx>0 ? `blur(${blurPx*(cv.width/1000)}px)` : "none";
-  strokeCables(fg, Math.max(0.35, D.dia*scale)*gain, 1);
-  ctx.restore(); ctx.filter="none";
 }
 function drawBulbs(bg,fg){
   strokeCables(fg, Math.max(0.3,D.dia*scale)*0.5, 0.13);
@@ -1210,6 +2013,13 @@ function drawTech(bg,fg,lw){
   ctx.setLineDash([4,5]); ctx.beginPath();
   for(let r=0;r<=D.R;r++){ctx.moveTo(0,r*D.dy*scale);ctx.lineTo(D.W*scale,r*D.dy*scale);}
   ctx.stroke(); ctx.setLineDash([]);
+  /* base lattice strands */
+  if(D.latPat){ ctx.strokeStyle = polarity? "rgba(200,120,40,.55)" : "rgba(255,200,120,.5)"; ctx.lineWidth=Math.max(1.2,2*scale/200); ctx.beginPath();
+    for(const nd of D.nodes) if(nd.isBase){ for(let i=0;i<nd.path.length;i++){ const X=nd.path[i]*scale, Y=(nd.birth+i)*D.dy*scale; if(i===0) ctx.moveTo(X,Y); else ctx.lineTo(X,Y); } } ctx.stroke(); }
+  /* lattice figure: the holes */
+  if(D.lattice && D.voidMask){ ctx.fillStyle = polarity? "rgba(216,162,74,.22)" : "rgba(216,162,74,.18)";
+    for(let r=0;r<=D.R;r++) for(let c=0;c<D.layout.cols;c++) if(D.voidMask[r*D.layout.cols+c])
+      ctx.fillRect((D.P.margin+c*D.colPitch)*scale, (r-0.5)*D.dy*scale, D.colPitch*scale, D.dy*scale); }
   /* structural columns as full-height rails */
   ctx.strokeStyle = polarity? "rgba(200,120,40,.55)" : "rgba(255,200,120,.5)"; ctx.lineWidth=Math.max(2,4*scale/200);
   ctx.beginPath(); for(const nd of D.nodes) if(nd.structural){ const X=nd.xBase*scale; ctx.moveTo(X,0); ctx.lineTo(X,D.maxD*scale); } ctx.stroke();
@@ -1218,7 +2028,9 @@ function drawTech(bg,fg,lw){
     ctx.beginPath();
     for(let i=0;i<nd.path.length;i++){
       const X=nd.path[i]*scale, Y=(nd.birth+i)*D.dy*scale;
-      if(i===0) ctx.moveTo(X,Y); else ctx.lineTo(X,Y);
+      if(i===0) ctx.moveTo(X,Y);
+      else if(D.gridOn && !D.diag){ const Xp=nd.path[i-1]*scale; ctx.lineTo(Xp,Y); if(Math.abs(X-Xp)>0.5) ctx.lineTo(X,Y); }   // down, then along the row
+      else ctx.lineTo(X,Y);
     }
     ctx.lineWidth=Math.max(1, D.bw(nd.count[0]||1)*scale);
     ctx.strokeStyle = polarity? "rgba(13,11,9,.6)":"rgba(239,233,222,.6)";
@@ -1238,7 +2050,7 @@ function drawTech(bg,fg,lw){
   /* weft floats */
   ctx.strokeStyle = polarity? "rgba(40,120,100,.9)" : "rgba(127,179,163,.95)";
   ctx.lineWidth=Math.max(1.5, 3*scale/200); ctx.beginPath();
-  for(const h of D.hops){ ctx.moveTo(h.xa*scale,h.y*scale); ctx.lineTo(h.xb*scale,(h.y+D.P.weftSag*0.5)*scale); }
+  for(const h of D.hops.concat(D.latHops||[])){ const Y=(h.y + (D.gridOn?0:D.P.weftSag*0.5))*scale; ctx.moveTo(h.xa*scale,Y); ctx.lineTo(h.xb*scale,Y); }
   ctx.stroke();
   let lim=0; for(const nd of D.nodes) for(const l of nd.lat) lim=Math.max(lim,Math.abs(l));
   for(const nd of D.nodes) for(let i=0;i<nd.lat.length;i++){
@@ -1251,6 +2063,7 @@ function drawTech(bg,fg,lw){
   const r=Math.max(1.1,0.01*scale); ctx.beginPath();
   for(const b of D.bulbs){ctx.moveTo(b[0]*scale+r,b[1]*scale);ctx.arc(b[0]*scale,b[1]*scale,r,0,6.2832);}
   ctx.fill();
+  drawCarrier();
 }
 
 /* ═══════════════════════ CHARTS ═══════════════════════ */
@@ -1355,8 +2168,9 @@ function drawStatsBody(){
     row("pick pitch", fmt(D.dy*1000,0)+" mm")+
     row("anisotropy pick : pair", fmt(aniso,1)+" : 1", aniso>1.6&&aniso<3.5?"good":"")+
     row("cables per strand at beam", D.perStrand+(D.N%D.S?"–"+(D.perStrand+1):""))+
-    (D.gridOn ? row("moves", "orthogonal · ≤ "+D.P.maxStep+" cells per row") : row("one-pair move leans", fmt(Math.atan2(D.colPitch,D.dy)*180/Math.PI,0)+"°"))+
-    (()=>{ const c=D.layout.seq.find(b=>b.isCentre); if(!c) return row("layout","tile · "+D.P.tile.motif+" ×"+D.layout.seq.filter(b=>!b.isGround).length+" · stagger "+D.P.tile.stagger);
+    (D.gridOn ? row("moves", (D.diag? "diagonal · one cell per row = "+fmt(Math.atan2(D.colPitch,D.dy)*180/Math.PI,1)+"° from vertical" : "orthogonal")+" · ≤ "+D.P.maxStep+" cells per row") : row("one-pair move leans", fmt(Math.atan2(D.colPitch,D.dy)*180/Math.PI,0)+"°"))+
+    (()=>{ const c=D.layout.seq.find(b=>b.isCentre); if(D.lattice) return row("layout","diagonal lattice · start every "+D.P.latSpacing+" · "+D.P.latStep+" cell/row · ±"+fmt(D.latAngle,1)+"°");
+           if(!c) return row("layout","tile · "+D.P.tile.motif+" ×"+D.layout.seq.filter(b=>!b.isGround).length+" · stagger "+D.P.tile.stagger);
            const seqRows=c.rows.length*c.rs;
            return row("centre sequence", seqRows+" picks · "+(seqRows>D.R+1? (D.R+1)+" shown":"fits"), seqRows>D.R+1?"bad":"good"); })()+
     `<p class="note" style="margin-top:4px">${bandsTxt}${D.P.mirror?" · mirrored":""}</p>`;
@@ -1368,9 +2182,28 @@ function drawStatsBody(){
     row("crossings per cable", fmt(perCable,1), perCable>=4?"good":perCable>=1?"":"bad")+
     row("turns per cable  mean / max", fmt(D.turnsMean,1)+" / "+D.turnsMax, D.turnsMean>=2?"good":"")+
     (D.gridOn
-      ? row("strand runs along row lines", D.runs+" · "+fmt(D.runLen,0)+" m · mean "+(D.runs?fmt(D.runLen/D.runs*1000,0):"–")+" mm")
+      ? row(D.diag? "diagonal strand runs (steepest "+fmt(angDeg,0)+"°)" : "strand runs along row lines", D.runs+" · "+fmt(D.runLen,0)+" m extra · mean "+(D.runs?fmt(D.runLen/D.runs*1000,0):"–")+" mm")
       : row("steepest run from vertical", fmt(angDeg,0)+"°", angDeg>50?"bad":angDeg>38?"":"good"))+
-    (D.gridOn ? `<div class="stat hi"><span>— structure —</span><b></b></div>`+
+    (D.lattice ? `<div class="stat hi"><span>— structure —</span><b></b></div>`+
+      row("diagonal lattice", "±"+fmt(D.latAngle,1)+"° (rows "+fmt(D.dy*1000,0)+" mm) · "+D.S+" strands · every node a tied crossing")+
+      (D.latPat ? row("base lattice", D.baseN+" strands · "+D.baseCables+" cables ("+Math.round(100*D.baseCables/D.N)+" %) · "+D.P.netPre+" N pretension")+
+        row("pattern bundles", (D.S-D.baseN)+" strands · "+(D.N-D.baseCables)+" cables · move along lattice edges")+
+        row("pattern turns · refused", D.patTurns+" · "+D.patRefused, D.patRefused>D.patTurns*0.5?"bad":D.patRefused?"":"good")+
+        row("pattern segments  diagonal · vertical · horizontal", D.patD+" · "+D.patV+" · "+D.patH)+
+        (D.routeStats ? row("route model", `${D.routeStats.mode} · ${D.routeStats.instances} copies · ${D.routeStats.paths} paths · ${D.routeStats.cables} routed cables + ${D.routeStats.carrier} carrier`)+
+          row("cable length  min / mean / max", `${fmt(D.routeStats.minLen,1)} / ${fmt(D.routeStats.meanLen,1)} / ${fmt(D.routeStats.maxLen,1)} m · ${fmt(D.routeStats.pathsPerCable,1)} paths per cable`)+
+          row("paths without a cable", D.routeStats.unserved, D.routeStats.unserved?"bad":"good") : "")+
+        row("worst node shift from a turn", fmt(D.maxNodeShift*1000,0)+" mm (allowed "+D.P.maxSag+")", D.maxNodeShift*1000>D.P.maxSag?"bad":"good") : "")+
+      row("sideways pull at a crossing", "cancels (both families turn/pass symmetrically)", "good")+
+      row("rail bounces · max pull on a rail tie", D.bounces+" · "+fmt(D.maxRailPull,0)+" N")+
+      (D.mirror ? row("figure", D.P.lat.figure.replace("glyph:","")+" by chevrons · "+D.mirrorTurns+" mirror turns · pulls cancel at every mirror node","good") : "")+
+      (D.densFig ? row("figure", D.P.lat.figure.replace("glyph:","")+" by density · inside sheds ×"+D.P.lat.density+" · net uniform, no extra load","good")+
+        row("bulbs inside the figure", Math.round(100*D.bulbsInFig/D.N)+" % of bulbs in "+Math.round(100*D.figCells)+" % of the wall") : "")+
+      (D.holes ? row("figure turns · nodes", D.figBounces+" · "+D.turnNodes)+
+        row("turn nodes not cancelled", D.unbalanced+" · worst "+fmt(D.maxUnbalPull,0)+" N → node shifts ≈ "+fmt(D.maxUnbalShift*1000,0)+" mm", D.maxUnbalShift>0.08?"bad":D.maxUnbalShift>0.04?"":"good")+
+        row("strands forced through a hole", D.passThrough, D.passThrough?"bad":"good") : "")+
+      `<div class="stat hi"><span>— weft —</span><b></b></div>` :
+     D.gridOn ? `<div class="stat hi"><span>— structure —</span><b></b></div>`+
       row("corners without support", D.unsupported, D.unsupported? "bad":"good")+
       row("corners held by a rib", D.ribCorners+" of "+D.corners.length+(D.ribBroken?" · "+D.ribBroken+" lost: no rib under them":""), D.ribBroken?"bad":"")+
       row("worst rib sag under a corner", fmt(D.maxSag*1000,0)+" mm at "+D.P.ribTension+" N", D.maxSag*1000>D.P.maxSag?"bad":"good")+
@@ -1416,6 +2249,8 @@ function drawStatsBody(){
     row("mean nearest neighbour", fmt(D.nnMean*1000,0)+" mm", D.nnMean>D.rTarget*0.62?"good":"bad")+
     row("closest pair", fmt(D.nnMin*1000,0)+" mm", D.nnMin>0.05?"good":"bad")+
     row("cluster CV (0 = perfect)", fmt(D.cv,2), D.cv<0.35?"good":D.cv<0.55?"":"bad")+
+    row("drop runs along a row", D.dropRuns+" · "+fmt(D.dropLen,0)+" m")+
+    row("bulb seed", D.bulbSeed===D.P.seed ? "= design seed" : String(D.bulbSeed))+
     row("per 0.5 m slice", D.sliceLo+" – "+D.sliceHi+" bulbs")+
     row("vertical evenness CV", fmt(D.sliceCV,2), D.sliceCV<0.15?"good":D.sliceCV<0.28?"":"bad");
   document.getElementById("lenStats").innerHTML =
@@ -1448,14 +2283,14 @@ function drawStatsBody(){
 const SLIDERS = [
   ["width",v=>fmt(v,1)+" m"],["height",v=>fmt(v,1)+" m"],["count",v=>v|0],
   ["dia",v=>fmt(v,1)],["gpm",v=>v|0],["bulbMass",v=>(v|0)+" g"],
-  ["gridPitch",v=>fmt(v*1000,0)+" mm"],["maxStep",v=>(v|0)+" cells"],["laneOff",v=>fmt(v*1000,0)+" mm"],["ribTension",v=>(v|0)+" N"],["maxSag",v=>(v|0)+" mm"],["reserve",v=>(v|0)+" cables"],
+  ["gridPitch",v=>fmt(v*1000,0)+" mm"],["gridRowPitch",v=>v?fmt(v*1000,0)+" mm":"square"],["maxStep",v=>(v|0)+" cells"],["laneOff",v=>fmt(v*1000,0)+" mm"],["ribTension",v=>(v|0)+" N"],["maxSag",v=>(v|0)+" mm"],["reserve",v=>(v|0)+" cables"],
   ["rows",v=>v|0],["maxDepth",v=>fmt(v,1)+" m"],["margin",v=>fmt(v*1000,0)+" mm"],
   ["rowScale",v=>(v|0)],["maxAng",v=>(v|0)+"°"],["snap",v=>v?(v|0)+" mm":"off"],["pack",v=>fmt(v,2)],
   ["twine",v=>fmt(v,2)],["twinePer",v=>v|0],
   ["weftEvery",v=>v?(v|0)+" picks":"off"],["weftPhase",v=>v|0],["weftFloat",v=>(v|0)+" cells"],["weftStep",v=>(v|0)+" cells"],["weftJitter",v=>fmt(v,2)],
   ["weftHops",v=>v|0],["weftMax",v=>v|0],["weftSag",v=>fmt(v*1000,0)+" mm"],
   ["shedGamma",v=>fmt(v,2)],["tailFactor",v=>fmt(v,1)],["bnTries",v=>v|0],
-  ["minGap",v=>(v|0)+" mm"],["topClear",v=>fmt(v,2)+" m"],
+  ["minGap",v=>(v|0)+" mm"],["topClear",v=>fmt(v,2)+" m"],["bulbDrift",v=>fmt(v,2)],["bulbReach",v=>(v|0)+" cells"],
 ];
 function syncInputs(){
   for(const [k,f] of SLIDERS){
@@ -1466,14 +2301,28 @@ function syncInputs(){
   document.getElementById("mirror").checked=!!P.mirror;
   document.getElementById("grid").checked=!!P.grid;
   document.getElementById("edgeRails").checked=!!P.edgeRails;
+  document.getElementById("diagonal").checked=!!P.diagonal;
   document.getElementById("layout").value=P.layout||"sadu";
-  document.getElementById("tileMotif").value=P.tile.motif; document.getElementById("tileDup").value=P.tile.dup;
+  document.getElementById("tileMotif").value=LEX[P.tile.motif]?P.tile.motif:"ein"; document.getElementById("tileDup").value=P.tile.dup;
   document.getElementById("tileGap").value=P.tile.gap; document.getElementById("tileStagger").value=P.tile.stagger;
-  document.getElementById("saduBox").style.display = P.layout==="tile" ? "none" : "";
-  document.getElementById("tileBox").style.display = P.layout==="tile" ? "" : "none";
+  document.getElementById("saduBox").style.display = P.layout==="sadu" ? "" : "none";
+  document.getElementById("tileBox").style.display = (P.layout==="tile" || (P.layout==="lattice" && P.latPattern)) ? "" : "none";
+  document.getElementById("latticeBox").style.display = P.layout==="lattice" ? "" : "none";
+  document.getElementById("latSpacing").value=P.latSpacing; document.getElementById("latStep").value=P.latStep;
+  document.getElementById("latAngle").value=P.latAngle; document.getElementById("patMoves").value=P.patMoves||"all";
+  document.getElementById("latFrame").value=P.latFrame||"rotated"; document.getElementById("latCell").value=P.latCell; document.getElementById("latReach").value=P.latReach;
+  document.getElementById("latMotif").value=P.drawn ? "drawn" : P.tile.motif;
+  document.getElementById("drawnInfo").textContent = P.drawn ? `${P.drawn.segs.length} segments · repeat (${P.drawn.a}) & (${P.drawn.b}) · ${P.drawn.kind==="vd"?"V+D":"±θ"} ${P.drawn.pitch} cm ${P.drawn.angle}°`+(P.drawn.offGrid?` · ${P.drawn.offGrid} off-grid lines not used by flow yet`:"") : ""; document.getElementById("latTurn").value=P.latTurn; document.getElementById("latWarp").value=P.latWarp||"both"; document.getElementById("latMove").value=P.latMove||"straight"; document.getElementById("latFree").checked=!!P.latFree; document.getElementById("latFlow").checked=!!P.latFlow; document.getElementById("flowLight").value=P.flowLight; document.getElementById("flowSink").checked=P.flowSink!==false; document.getElementById("routeMode").value=P.routeMode||"flow"; document.getElementById("cableLen").value=P.cableLen; document.getElementById("sinkBoost").value=P.sinkBoost; document.getElementById("latKind").value=P.latKind||"xx"; document.getElementById("railShare").value=P.railShare; document.getElementById("patSpacing").value=P.patSpacing; document.getElementById("latGap").value=P.tile.gap; document.getElementById("latStagger2").value=P.tile.stagger;
+  { const rp=Math.max(1,P.latStep|0)*P.gridPitch/Math.tan(clamp(P.latAngle,15,75)*Math.PI/180);
+    document.getElementById("latAngleVal").textContent=P.latAngle+"° → rows "+fmt(rp*1000,0)+" mm ("+Math.round(Math.min(P.maxDepth,P.height)/rp)+" rows)"; }
+  document.getElementById("gridRowPitch").disabled = P.layout==="lattice";
+  document.getElementById("latFigure").value=P.lat.figure; document.getElementById("latScale").value=P.lat.scale;
+  document.getElementById("latPattern").checked=!!P.latPattern; document.getElementById("baseFrac").value=P.baseFrac; document.getElementById("netPre").value=P.netPre; document.getElementById("baseEnd").value=P.baseEnd;
+  document.getElementById("latMode").value=P.lat.mode||"density"; document.getElementById("latDensity").value=P.lat.density;
+  document.getElementById("latStagger").value=P.lat.stagger; document.getElementById("latGapX").value=P.lat.gapX; document.getElementById("latGapY").value=P.lat.gapY;
   document.getElementById("rows").disabled=!!P.grid;
   ["maxAng","snap"].forEach(id=>document.getElementById(id).disabled=!!P.grid);
-  { const cols=Math.max(2,Math.round((P.width-2*P.margin)/P.gridPitch)), rows=Math.max(4,Math.round(Math.min(P.maxDepth,P.height)/P.gridPitch));
+  { const cols=Math.max(2,Math.round((P.width-2*P.margin)/P.gridPitch)), rows=Math.max(4,Math.round(Math.min(P.maxDepth,P.height)/(P.gridRowPitch>0?P.gridRowPitch:P.gridPitch)));
     const per=P.count/cols;
     document.getElementById("gridNote").innerHTML = P.grid
       ? `${P.count} cables over ${fmt(P.width,1)} m is a ${fmt(P.width/P.count*1000,1)} mm pitch — a curtain. On a
@@ -1490,8 +2339,6 @@ function syncInputs(){
   document.getElementById("cGap").value=P.centre.gap; document.getElementById("cDup").value=P.centre.dup;
   document.getElementById("cRowScale").value=P.centre.rowScale||1;
   document.getElementById("cFit").checked=!!P.centre.fit;
-  document.getElementById("blur").value=blurPx;
-  document.getElementById("blur").parentElement.querySelector(".val").textContent=fmt(blurPx,1);
   document.getElementById("gain").value=gain;
   document.getElementById("gain").parentElement.querySelector(".val").textContent=fmt(gain,1);
 }
@@ -1575,12 +2422,83 @@ for(const [k,f] of SLIDERS){
 }
 document.getElementById("mirror").addEventListener("change",e=>{ P.mirror=e.target.checked; regen(); });
 document.getElementById("layout").addEventListener("change",e=>{ P.layout=e.target.value; syncInputs(); regen(); });
+document.getElementById("latSpacing").addEventListener("input",e=>{ P.latSpacing=Math.max(1,parseInt(e.target.value)||1); regen(); });
+document.getElementById("latStep").addEventListener("input",e=>{ P.latStep=Math.max(1,Math.min(2,parseInt(e.target.value)||1)); syncInputs(); regen(); });
+document.getElementById("latAngle").addEventListener("input",e=>{ P.latAngle=clamp(parseInt(e.target.value)||45,15,75); syncInputs(); regen(); });
+document.getElementById("patMoves").addEventListener("change",e=>{ P.patMoves=e.target.value; regen(); });
+document.getElementById("latFrame").addEventListener("change",e=>{ P.latFrame=e.target.value; regen(); });
+document.getElementById("latCell").addEventListener("input",e=>{ P.latCell=Math.max(1,parseInt(e.target.value)||1); regen(); });
+document.getElementById("latMotif").innerHTML=`<option value="drawn">drawn design (loaded below)</option>`+LLEX_KEYS.map(k=>`<option value="${k}">${LLEX[k].label}</option>`).join("")+`<option disabled>── tile motifs, turned 45° ──</option>`+LEX_KEYS.map(k=>`<option value="${k}">${LEX[k].label}</option>`).join("");
+document.getElementById("patSpacing").addEventListener("input",e=>{ P.patSpacing=Math.max(1,parseInt(e.target.value)||1); regen(); });
+document.getElementById("latKind").addEventListener("change",e=>{ P.latKind=e.target.value; regen(); });
+document.getElementById("railShare").addEventListener("input",e=>{ P.railShare=clamp(parseFloat(e.target.value)||0,0,0.6); regen(); });
+document.getElementById("sinkBoost").addEventListener("input",e=>{ P.sinkBoost=clamp(parseFloat(e.target.value)||1,1,2); regen(); });
+document.getElementById("routeMode").addEventListener("change",e=>{ P.routeMode=e.target.value; regen(); });
+document.getElementById("cableLen").addEventListener("input",e=>{ P.cableLen=clamp(parseFloat(e.target.value)||9,1,40); regen(); });
+document.getElementById("flowSink").addEventListener("change",e=>{ P.flowSink=e.target.checked; regen(); });
+document.getElementById("flowLight").addEventListener("input",e=>{ P.flowLight=clamp(parseFloat(e.target.value)||0.04,0.005,0.5); regen(); });
+document.getElementById("latFlow").addEventListener("change",e=>{ P.latFlow=e.target.checked; if(P.latFlow) P.latPattern=false; syncInputs(); regen(); });
+document.getElementById("latFree").addEventListener("change",e=>{ P.latFree=e.target.checked; regen(); });
+document.getElementById("latMove").addEventListener("change",e=>{ P.latMove=e.target.value; regen(); });
+document.getElementById("latWarp").addEventListener("change",e=>{ P.latWarp=e.target.value; regen(); });
+document.getElementById("latTurn").addEventListener("input",e=>{ P.latTurn=clamp(parseFloat(e.target.value)||0,0,1); regen(); });
+document.getElementById("latMotif").addEventListener("change",e=>{ P.tile.motif=e.target.value; if(e.target.value!=="drawn") P.drawn=null; syncInputs(); regen(); });
+document.getElementById("loadDrawn").onclick=()=>document.getElementById("drawnFile").click();
+document.getElementById("drawnFile").onchange=(e)=>{ const f=e.target.files[0]; if(!f) return; const rd=new FileReader();
+  rd.onload=()=>{ try{ let txt=rd.result, j; if(/^\s*</.test(txt)){ const m=txt.match(/<metadata>([\s\S]*?)<\/metadata>/); if(!m) throw new Error("no design metadata in the SVG"); j=JSON.parse(m[1]); } else j=JSON.parse(txt);
+      const d=drawnFromEditor(j); if(!d) throw new Error("no painted segments");
+      P.drawn=d; P.layout="lattice"; P.latFlow=true; P.latPattern=false; P.latKind = d.kind==="vd" ? "vd" : "xx"; P.latSpacing=Math.max(2,Math.round(d.pitch/(P.gridPitch*100))); P.latAngle=d.angle; P.tile.motif="drawn";
+      setFamily(""); document.getElementById("preset").value=""; syncInputs(); regen(); }catch(err){ alert("could not load: "+err.message); } };
+  rd.readAsText(f); e.target.value=""; };
+/* editor design → drawn motif: segments in lattice units (i = x / (pitch/2), j = y / one app row), repeat from the colour copies */
+function drawnFromEditor(j){
+  const lat=j.lattice||{}, res=j.latticeResolved||{}; const p=+lat.pitch||20, ang=+res.angle||+lat.angle||45;
+  const ux=p/2, uy=(p/2)/Math.tan(ang*Math.PI/180);
+  const groups=new Map();
+  const parts=new Map();                                   // parent segment id → {colour, n painted, N sub-segments, coords}
+  for(const x of (j.segments||[])){ const pid=String(x.id).split(".")[0]+"|"+x.colour, N=x.sub||1;   // one entry per segment AND colour
+    if(!parts.has(pid)) parts.set(pid,{colour:x.colour, n:0, N, x1:x.x1_m, y1:x.y1_m, x2:x.x2_m, y2:x.y2_m});
+    const q=parts.get(pid); q.n++; q.x1=Math.min(q.x1,x.x1_m,x.x2_m); q.y1=Math.min(q.y1,x.y1_m,x.y2_m); q.x2=Math.max(q.x2,x.x1_m,x.x2_m); q.y2=Math.max(q.y2,x.y1_m,x.y2_m); }
+  for(const [pid,q] of parts){ if(q.n*2<q.N) continue;     // less than half of a subdivided segment painted: not a cable route
+    /* the parent segment runs node to node: snap its ends outward to the node grid */
+    let sg=[Math.round(q.x1*100/ux),Math.round(q.y1*100/uy),Math.round(q.x2*100/ux),Math.round(q.y2*100/uy)];
+    if(q.x2<q.x1+1e-9){ sg[0]=sg[2]=Math.round(q.x1*100/ux); }
+    if(sg[3]<sg[1]) sg=[sg[2],sg[3],sg[0],sg[1]];
+    if(!groups.has(q.colour)) groups.set(q.colour,[]); groups.get(q.colour).push(sg); }
+  /* free anchor-to-anchor lines: those that are exactly one lattice step join the chart; off-grid ones are counted only */
+  let offGrid=0; const stepsOK = (lat.kind==="vd") ? [[0,2],[2,2]] : [[1,1],[-1,1]];
+  for(const l of (j.lines||[])){ let sg=[Math.round(l.x1_m*100/ux),Math.round(l.y1_m*100/uy),Math.round(l.x2_m*100/ux),Math.round(l.y2_m*100/uy)]; if(sg[3]<sg[1]) sg=[sg[2],sg[3],sg[0],sg[1]];
+    const d=[sg[2]-sg[0], sg[3]-sg[1]]; if(!stepsOK.some(q=>q[0]===d[0]&&q[1]===d[1])){ offGrid++; continue; }
+    if(!groups.has(l.colour)) groups.set(l.colour,[]); groups.get(l.colour).push(sg); }
+  if(!groups.size) return null;
+  const cols=[...groups.keys()]; const org=(g)=>[Math.min(...g.map(s=>Math.min(s[0],s[2]))), Math.min(...g.map(s=>Math.min(s[1],s[3])))];
+  const o0=org(groups.get(cols[0])); const offs=cols.slice(1).map(c=>{ const o=org(groups.get(c)); return [o[0]-o0[0],o[1]-o0[1]]; }).sort((u,v)=>(u[0]*u[0]+u[1]*u[1])-(v[0]*v[0]+v[1]*v[1]));
+  let a=offs[0], b=offs.find(v=>a && (a[0]*v[1]-a[1]*v[0])!==0);
+  const g0=groups.get(cols[0]); const w=Math.max(...g0.map(s=>Math.max(s[0],s[2])))-o0[0]+2, h=Math.max(...g0.map(s=>Math.max(s[1],s[3])))-o0[1]+2;
+  if(!a) a = lat.kind==="vd" ? [w+(w%2),0] : [w+(w%2), w+(w%2)];                                   // one colour: repeat by the motif's own width
+  if(!b) b = lat.kind==="vd" ? [0, h+(h%2)] : [w+(w%2), -(w+(w%2))];
+  return {kind: lat.kind==="vd" ? "vd" : "xx", pitch:p, angle:+ang.toFixed(2), a, b, segs:g0, offGrid, source: j.source||"lattice-editor"};
+}
+document.getElementById("latGap").addEventListener("input",e=>{ P.tile.gap=Math.max(0,parseInt(e.target.value)||0); syncInputs(); regen(); });
+document.getElementById("latStagger2").addEventListener("input",e=>{ P.tile.stagger=Math.max(0,parseInt(e.target.value)||0); syncInputs(); regen(); });
+document.getElementById("latReach").addEventListener("input",e=>{ P.latReach=Math.max(1,parseInt(e.target.value)||1); regen(); });
+document.getElementById("latFigure").innerHTML='<option value="none">none — plain net</option>'+LEX_KEYS.filter(k=>k!=="ground"&&k!=="stripe").map(k=>`<option value="${k}">${LEX[k].label}</option>`).join("")+GLYPH_KEYS.map(k=>`<option value="glyph:${k}">glyph — ${GLYPHS[k].label}</option>`).join("");
+document.getElementById("latFigure").addEventListener("change",e=>{ P.lat.figure=e.target.value; regen(); });
+document.getElementById("latPattern").addEventListener("change",e=>{ P.latPattern=e.target.checked; syncInputs(); regen(); });
+document.getElementById("baseFrac").addEventListener("input",e=>{ P.baseFrac=clamp(parseFloat(e.target.value)||0.25,0.05,0.6); regen(); });
+document.getElementById("netPre").addEventListener("input",e=>{ P.netPre=Math.max(0,parseFloat(e.target.value)||0); regen(); });
+document.getElementById("baseEnd").addEventListener("input",e=>{ P.baseEnd=clamp(parseFloat(e.target.value)||0.6,0.3,1); regen(); });
+document.getElementById("latMode").addEventListener("change",e=>{ P.lat.mode=e.target.value; regen(); });
+document.getElementById("latDensity").addEventListener("input",e=>{ P.lat.density=Math.max(0.1,parseFloat(e.target.value)||1); regen(); });
+for(const [id,k] of [["latScale","scale"],["latStagger","stagger"],["latGapX","gapX"],["latGapY","gapY"]])
+  document.getElementById(id).addEventListener("input",e=>{ P.lat[k]=Math.max(k==="scale"?1:0,parseInt(e.target.value)||0); regen(); });
 document.getElementById("tileMotif").innerHTML=LEX_KEYS.map(k=>`<option value="${k}">${LEX[k].label}</option>`).join("");
 document.getElementById("tileMotif").addEventListener("change",e=>{ P.tile.motif=e.target.value; regen(); });
 for(const [id,k] of [["tileDup","dup"],["tileGap","gap"],["tileStagger","stagger"]])
   document.getElementById(id).addEventListener("input",e=>{ P.tile[k]=Math.max(0,parseInt(e.target.value)||0); if(k==="dup") P.tile.dup=Math.max(1,P.tile.dup); regen(); });
 document.getElementById("grid").addEventListener("change",e=>{ P.grid=e.target.checked; syncInputs(); regen(); });
-for(const id of ["gridPitch","maxStep","laneOff"]) document.getElementById(id).addEventListener("input",()=>syncInputs());
+document.getElementById("diagonal").addEventListener("change",e=>{ P.diagonal=e.target.checked; regen(); });
+for(const id of ["gridPitch","gridRowPitch","maxStep","laneOff"]) document.getElementById(id).addEventListener("input",()=>syncInputs());
 document.getElementById("edgeRails").addEventListener("change",e=>{ P.edgeRails=e.target.checked; regen(); });
 document.getElementById("weftSpan").addEventListener("change",e=>{ P.weftSpan=e.target.value; regen(); });
 for(const id of ["weftFloat","weftStep","weftHops","weftEvery"]) document.getElementById(id).addEventListener("input",()=>syncInputs());
@@ -1591,7 +2509,7 @@ document.getElementById("cFit").addEventListener("change",e=>{ P.centre.fit=e.ta
 document.getElementById("btnAddGlyph").onclick=()=>{ P.centre.glyphs.push(GLYPH_KEYS[Math.floor(Math.random()*GLYPH_KEYS.length)]); buildGlyphs(); regen(); };
 document.getElementById("btnGlyphsAuto").onclick=()=>{ P.centre.glyphs=randomGlyphs(Math.random); buildGlyphs(); regen(); };
 document.getElementById("btnAddBorder").onclick=()=>{ P.borders.push(bd(LEX_KEYS[Math.floor(Math.random()*LEX_KEYS.length)],1,1)); buildBorders(); regen(); };
-document.getElementById("seed").addEventListener("input",e=>{P.seed=parseInt(e.target.value)||0;regen();});
+document.getElementById("seed").addEventListener("input",e=>{P.seed=parseInt(e.target.value)||0;P.bulbSeed=P.seed;regen();});
 function randomGlyphs(R){ const n=1+Math.floor(R()*4); const g=[]; for(let i=0;i<n;i++) g.push(GLYPH_KEYS[Math.floor(R()*GLYPH_KEYS.length)]); return g; }
 function randomComposition(R){
   const nb=2+Math.floor(R()*4); const borders=[];
@@ -1599,22 +2517,27 @@ function randomComposition(R){
   const centre={glyphs:randomGlyphs(R), gap:1+Math.floor(R()*5), dup:1+Math.floor(R()*3), rowScale:R()<0.7?1:2, fit:R()<0.8};
   return {borders,centre};
 }
-document.getElementById("btnRand").onclick=()=>{P.seed=(Math.random()*1e9)|0;currentFavId=null;syncInputs();regen(true);logSeen();renderFavs();};
+document.getElementById("btnRand").onclick=()=>{P.seed=(Math.random()*1e9)|0;P.bulbSeed=P.seed;currentFavId=null;syncInputs();regen(true);logSeen();renderFavs();};
+document.getElementById("btnBulbs").onclick=()=>{P.bulbSeed=(Math.random()*1e9)|0;currentFavId=null;regen(true);renderFavs();};
 function randomiseWithin(pr){
   /* keep the idea of the preset — layout, motif(s), glyphs, mirroring, grid — and
      vary the rest inside ranges that keep the structure standing              */
   const R=Math.random, ri=(a,b)=>a+Math.floor(R()*(b-a+1)), rf=(a,b)=>a+R()*(b-a), pick=a=>a[Math.floor(R()*a.length)];
   applyParams(pr);
-  P.seed=(R()*1e9)|0;
+  P.seed=(R()*1e9)|0; P.bulbSeed=P.seed; P.bulbDrift=+rf(0.3,0.8).toFixed(2); P.bulbReach=ri(1,3);
   P.gridPitch=+(Math.round(pr.gridPitch*rf(0.9,1.15)/0.005)*0.005).toFixed(3);
-  P.maxStep=clamp((pr.maxStep|0)+ri(-1,1),1,4); P.laneOff=0;
+  P.gridRowPitch = pr.gridRowPitch ? +(pr.gridRowPitch*P.gridPitch/pr.gridPitch).toFixed(4) : 0;   // keep the angle
+  P.maxStep= pr.diagonal ? pr.maxStep : clamp((pr.maxStep|0)+ri(-1,1),1,4); P.laneOff=0;
   P.rowScale=clamp((pr.rowScale|0)+(R()<0.3?ri(-1,1):0),1,3);
   P.twine=R()<0.15?0:+rf(0.6,1.2).toFixed(2); P.twinePer=clamp((pr.twinePer|0)+ri(-2,2),1,8);
   P.shedGamma=+rf(0.6,1.1).toFixed(2); P.tailFactor=+rf(0.5,2.5).toFixed(1); P.topClear=+pick([0.2,0.4,0.4,0.6]).toFixed(2); P.minGap=ri(30,100);
   /* rib ranges that keep the ribs continuous: one cable per run, runs of 6–8 cells,
      a new run every ⅓–½ run — measured: 2 cables per run or short tight runs deplete
      the strands and leave corners without a rib under them                     */
-  P.weftEvery=R()<0.9?1:2; P.weftPhase=0; P.weftFloat=ri(6,8); P.weftStep=clamp(Math.round(P.weftFloat*rf(0.33,0.5)),2,P.weftFloat);
+  if(pr.layout==="lattice"){ P.weftEvery=0; P.bulbDrift=0;
+    if(pr.latPattern){ P.baseFrac=+clamp(pr.baseFrac+rf(-0.05,0.08),0.06,0.5).toFixed(2); P.netPre=ri(150,300); P.latReach=clamp((pr.latReach|0)+ri(-2,3),2,16); P.latTurn=+clamp((pr.latTurn??0.5)+rf(-0.2,0.2),0,1).toFixed(1); P.latCell=clamp((pr.latCell||1)+(R()<0.3?ri(-1,1):0),1,3); P.baseEnd=+pick([0.5,0.6,0.7,0.8]).toFixed(2); P.tile.stagger=clamp((pr.tile.stagger|0)+ri(-2,2),0,10); P.tile.gap=Math.max(pr.tile.gap?1:0, pick([1,1,1,2])); }
+    if(pr.lat && pr.lat.figure!=="none"){ if(pr.lat.mode!=="holes") P.lat.density=+pick([2.5,3,4,5,6]).toFixed(1); P.lat.scale=clamp((pr.lat.scale|0)+(R()<0.4?ri(-1,1):0),1,5); P.lat.stagger=Math.max(0,(pr.lat.stagger|0)+ri(-2,2)); P.lat.gapX=Math.max(0,(pr.lat.gapX|0)+ri(-1,1)); P.lat.gapY=Math.max(0,(pr.lat.gapY|0)+ri(-1,1)); } }
+  else P.weftEvery=R()<0.9?1:2; P.weftPhase=0; P.weftFloat=ri(6,8); P.weftStep=clamp(Math.round(P.weftFloat*rf(0.33,0.5)),2,P.weftFloat);
   P.weftHops=1; P.weftMax=ri(4,6); P.weftJitter=R()<0.8?0:+rf(0.1,0.2).toFixed(2); P.weftSag=+rf(0,0.03).toFixed(3); P.weftSpan="wall";
   P.ribTension=ri(200,350); P.maxSag=ri(30,60); P.edgeRails=true; P.reserve=ri(2,4);
   if(pr.layout==="tile"){
@@ -1633,10 +2556,14 @@ document.getElementById("btnRandAll").onclick=()=>{
   if(family && PRESETS[family]){ randomiseWithin(PRESETS[family]); return; }
   /* every DESIGN variable, full range. Wall size, cable count, Ø, g/m and bulb mass are facts and stay. */
   const R=Math.random, ri=(a,b)=>a+Math.floor(R()*(b-a+1)), rf=(a,b)=>a+R()*(b-a), pick=a=>a[Math.floor(R()*a.length)];
-  P.seed=(R()*1e9)|0;
+  P.seed=(R()*1e9)|0; P.bulbSeed=P.seed; P.bulbDrift=+rf(0,1).toFixed(2); P.bulbReach=ri(1,4);
   P.grid=R()<0.85; P.gridPitch=+pick([0.08,0.09,0.1,0.1,0.1,0.11,0.125,0.14,0.175]).toFixed(3);
+  P.diagonal=R()<0.3; P.gridRowPitch= R()<0.7 ? 0 : +pick([0.058,0.115,0.173]).toFixed(3);
   P.maxStep=ri(1,4); P.laneOff=+rf(0,0.035).toFixed(4); P.ribTension=ri(60,300); P.maxSag=ri(20,80); P.edgeRails=R()<0.85; P.reserve=ri(0,5);
-  P.layout=R()<0.6?"tile":"sadu"; P.tile={motif:pick(LEX_KEYS.filter(k=>k!=="ground"&&k!=="stripe")), dup:R()<0.7?1:2, gap:R()<0.25?0:ri(1,3), stagger:ri(0,8)};
+  P.layout=R()<0.5?"tile":(R()<0.5?"lattice":"sadu"); P.latSpacing=ri(1,3); P.latStep=R()<0.75?1:2; if(P.layout==="lattice"){ P.weftEvery=0; P.bulbDrift=0; }
+  P.latPattern=R()<0.5; P.baseFrac=+pick([0.15,0.2,0.25,0.3,0.4]).toFixed(2); P.netPre=ri(0,300); P.baseEnd=+pick([0.5,0.6,0.7,0.85,1]).toFixed(2);
+  P.latAngle=pick([30,35,40,45,45,45,50,55,60]); P.patMoves=pick(["diag","diag","diagV","diagH","all"]); P.latFrame="edge"; P.latTurn=+rf(0,1).toFixed(1); P.latReach=ri(3,12); P.latCell=pick([1,1,1,2]); if(P.layout==="lattice"&&P.latPattern){ P.tile.motif=pick(LLEX_KEYS); if(/bricks|cells/.test(P.tile.motif)){ P.tile.gap=0; P.tile.stagger=ri(1,3); } }
+  P.lat={figure: R()<0.3?"none":pick(LEX_KEYS.filter(k=>k!=="ground"&&k!=="stripe").concat(GLYPH_KEYS.map(k=>"glyph:"+k))), mode:pick(["mirror","mirror","mirror","density","holes"]), density:+pick([0.25,0.4,2.5,4,6]).toFixed(2), scale:ri(1,4), stagger:ri(0,8), gapX:ri(0,4), gapY:ri(0,4)}; P.tile={motif:pick(LEX_KEYS.filter(k=>k!=="ground"&&k!=="stripe")), dup:R()<0.7?1:2, gap:R()<0.25?0:ri(1,3), stagger:ri(0,8)};
   P.rows=ri(20,50); P.rowScale=pick([1,1,2,2,3]); P.maxAng=ri(30,60); P.snap=0; P.pack=1;
   P.margin=+pick([0,0,0,0.05,0.1]).toFixed(2);
   P.twine=R()<0.2?0:+rf(0.5,1.2).toFixed(2); P.twinePer=ri(1,8);
@@ -1656,7 +2583,7 @@ function setFamily(name){
   family = name && PRESETS[name] ? name : null;
   document.getElementById("btnRandAll").textContent = family ? "⚄ Randomise within "+family : "⚄ Randomise all";
   document.getElementById("randNote").textContent = family
-    ? `keeps the ${PRESETS[family].layout==="tile" ? PRESETS[family].tile.motif+" tile" : "border motifs and centre glyphs"} of “${family}”, varies everything else within ranges that keep the structure`
+    ? `keeps the ${PRESETS[family].layout==="tile" ? PRESETS[family].tile.motif+" tile" : PRESETS[family].layout==="lattice" ? "diagonal lattice, its angle"+(PRESETS[family].latPattern?" and the "+PRESETS[family].tile.motif+" pattern on it":(PRESETS[family].lat&&PRESETS[family].lat.figure!=="none"?" and the "+PRESETS[family].lat.figure.replace("glyph:","")+" figure":"")) : "border motifs and centre glyphs"} of “${family}”, varies everything else within ranges that keep the structure`
     : "every design variable over its full range; wall and cable facts stay";
 }
 presetSel.onchange=()=>{ if(presetSel.value){ applyParams(PRESETS[presetSel.value]); currentFavId=null; syncInputs(); buildBorders(); regen(); } setFamily(presetSel.value); };
@@ -1671,6 +2598,14 @@ function applyParams(pr){
   if(src.weftMax==null) P.weftMax=4;
   if(src.ribTension==null) P.ribTension=250; if(src.maxSag==null) P.maxSag=40; if(src.edgeRails==null) P.edgeRails=true;
   if(src.reserve==null) P.reserve=3;
+  if(src.gridRowPitch==null) P.gridRowPitch=0; if(src.diagonal==null) P.diagonal=false;
+  if(src.latSpacing==null) P.latSpacing=2; if(src.latStep==null) P.latStep=1;
+  if(src.latPattern==null) P.latPattern=false; if(src.baseFrac==null) P.baseFrac=0.25; if(src.netPre==null) P.netPre=100; if(src.baseEnd==null) P.baseEnd=0.6;
+  if(src.latAngle==null){ const st=Math.max(1,P.latStep|0), rp=P.gridRowPitch>0?P.gridRowPitch:P.gridPitch; P.latAngle=Math.round(Math.atan2(st*P.gridPitch,rp)*180/Math.PI); }
+  if(src.patMoves==null) P.patMoves="all";
+  if(src.latFrame==null) P.latFrame="edge"; if(src.latMove==null) P.latMove="straight"; if(src.latFree==null) P.latFree=false; if(src.latFlow==null) P.latFlow=false; if(src.flowLight==null) P.flowLight=0.04; if(src.latKind==null) P.latKind="xx"; if(src.drawn===undefined) P.drawn=null; if(src.flowSink==null) P.flowSink=true; if(src.routeMode==null) P.routeMode="flow"; if(src.cableLen==null) P.cableLen=9; if(src.sinkBoost==null) P.sinkBoost=1; if(src.railShare==null) P.railShare=0.15; if(src.patSpacing==null) P.patSpacing=2; if(src.latWarp==null || src.latWarp===false) P.latWarp="both"; else if(src.latWarp===true) P.latWarp="warp"; if(src.latTurn==null) P.latTurn=0.5; else if(src.latTurn===true) P.latTurn=1; else if(src.latTurn===false) P.latTurn=0; if(src.latReach==null) P.latReach=8; if(src.latCell==null) P.latCell=1;
+  P.lat = Object.assign({figure:"none", mode:"holes", density:4, scale:2, stagger:0, gapX:1, gapY:1}, src.lat||{});
+  if(src.bulbSeed==null) P.bulbSeed=P.seed; if(src.bulbDrift==null) P.bulbDrift=0.5; if(src.bulbReach==null) P.bulbReach=2;
   if(!src.layout) P.layout="sadu";
   P.tile = Object.assign({motif:"ein",dup:1,gap:1,stagger:3}, src.tile||{});
   P.maxDepth=Math.min(P.maxDepth,P.height);
@@ -1681,11 +2616,6 @@ document.querySelectorAll("#viewSeg button").forEach(b=>b.onclick=()=>{
 });
 document.getElementById("btnPolarity").onclick=()=>{polarity=polarity?0:1;draw();};
 document.getElementById("showGrid").addEventListener("change",e=>{ showGrid=e.target.checked; draw(); });
-document.getElementById("blur").addEventListener("input",e=>{
-  blurPx=parseFloat(e.target.value);
-  e.target.parentElement.querySelector(".val").textContent=fmt(blurPx,1);
-  if(view!=="density"){document.querySelector('#viewSeg [data-v="density"]').click();} else draw();
-});
 document.getElementById("gain").addEventListener("input",e=>{
   gain=parseFloat(e.target.value);
   e.target.parentElement.querySelector(".val").textContent=fmt(gain,1); draw();
@@ -1706,7 +2636,7 @@ window.addEventListener("keydown",e=>{
   if(e.key==="r"){document.getElementById("btnRand").click();}
   if(e.key==="p"){polarity=polarity?0:1;draw();}
   if(e.key==="g"){ showGrid=!showGrid; document.getElementById("showGrid").checked=showGrid; draw(); }
-  if(e.key>="1"&&e.key<="4"){document.querySelectorAll("#viewSeg button")[+e.key-1].click();}
+  if(e.key>="1"&&e.key<="3"){document.querySelectorAll("#viewSeg button")[+e.key-1].click();}
 });
 
 /* ═══════════════════════ FAVOURITES ═══════════════════════ */
@@ -1746,7 +2676,7 @@ function thumbOf(D,px){
   x.stroke();
   try{ return c.toDataURL("image/png"); }catch(e){ return ""; }
 }
-function compName(p){ return p.layout==="tile" ? `tile ${p.tile.motif}×${p.tile.dup} st${p.tile.stagger}` : (p.borders||[]).map(b=>b.motif).join("+")+" | "+(p.centre?p.centre.glyphs.join("+"):""); }
+function compName(p){ return p.layout==="lattice" ? (p.latPattern ? `lattice+${p.tile.motif} st${p.tile.stagger} base${Math.round(p.baseFrac*100)}%` : `lattice /${p.latSpacing} ×${p.latStep}${p.lat&&p.lat.figure!=="none"?" · "+p.lat.figure.replace("glyph:","")+" s"+p.lat.scale:""}`) : p.layout==="tile" ? `tile ${p.tile.motif}×${p.tile.dup} st${p.tile.stagger}` : (p.borders||[]).map(b=>b.motif).join("+")+" | "+(p.centre?p.centre.glyphs.join("+"):""); }
 function favLabelDefault(){ return `#${FAVS.length+1} ${(typeof family!=="undefined"&&family)? family+" · " : ""}${compName(P)} · seed ${P.seed}`; }
 function renderFavs(){
   if(typeof fillEvFrom==="function") fillEvFrom();
@@ -1858,16 +2788,20 @@ const EV = { S:0.7, G:5, gen:0, parentName:"current design", hist:[], noise:1, t
 const GENES=[["rows",16,50,1],["shedGamma",0.4,2.0,0],["tailFactor",0,4,0],["maxAng",25,65,1],["topClear",0,1.5,0],
   ["rowScale",1,3,1],["twine",0,1.1,0],["twinePer",1,10,1],
   ["weftEvery",0,8,1],["weftPhase",0,7,1],["weftFloat",1,12,1],["weftStep",1,8,1],["weftJitter",0,1,0],["weftHops",1,3,1],["weftSag",0,0.12,0],
-  ["maxStep",1,5,1],["laneOff",0,0.04,0],["gridPitch",0.08,0.2,0],["weftMax",2,8,1],["ribTension",40,400,1],["maxSag",10,120,1],["reserve",1,6,1]];
+  ["maxStep",1,5,1],["laneOff",0,0.04,0],["gridPitch",0.08,0.2,0],["weftMax",2,8,1],["ribTension",40,400,1],["maxSag",10,120,1],["reserve",1,6,1],
+  ["bulbDrift",0,1,0],["bulbReach",1,4,1],["latSpacing",1,3,1],["latStep",1,2,1]];
+const LGENES=[["scale",1,5,1],["stagger",0,12,1],["gapX",0,6,1],["gapY",0,6,1],["density",0.25,6,0]];
+GENES.push(["baseFrac",0.1,0.5,0],["netPre",0,300,1],["baseEnd",0.4,1,0],["latAngle",25,65,1],["latReach",2,16,1],["latCell",1,3,1],["latTurn",0,1,0]);
 const TGENES=[["dup",1,3,1],["gap",0,4,1],["stagger",0,10,1]];
 const CGENES=[["gap",0,8,1],["dup",1,3,1],["rowScale",1,3,1]];
 const BGENES=[["dup",1,3,1],["gap",0,5,1],["phase",0,8,1]];
-const MAXB=6, NDIM=GENES.length+CGENES.length+TGENES.length+MAXB*BGENES.length;
+const MAXB=6, NDIM=GENES.length+CGENES.length+TGENES.length+LGENES.length+MAXB*BGENES.length;
 function vecOf(p){
   const v=[];
   for(const [k,lo,hi] of GENES) v.push(clamp(((p[k]??lo)-lo)/(hi-lo),0,1));
   for(const [k,lo,hi] of CGENES) v.push(clamp((((p.centre||{})[k]??lo)-lo)/(hi-lo),0,1));
   for(const [k,lo,hi] of TGENES) v.push(clamp((((p.tile||{})[k]??lo)-lo)/(hi-lo),0,1));
+  for(const [k,lo,hi] of LGENES) v.push(clamp((((p.lat||{})[k]??lo)-lo)/(hi-lo),0,1));
   const nb=Math.max(1,(p.borders||[]).length);
   for(let i=0;i<MAXB;i++){ const b=(p.borders||[])[Math.min(i,nb-1)]||{};
     for(const [k,lo,hi] of BGENES) v.push(clamp(((b[k]??lo)-lo)/(hi-lo),0,1)); }
@@ -1877,7 +2811,8 @@ function geneName(i){
   if(i<GENES.length) return GENES[i][0];
   i-=GENES.length; if(i<CGENES.length) return "centre."+CGENES[i][0];
   i-=CGENES.length; if(i<TGENES.length) return "tile."+TGENES[i][0];
-  i-=TGENES.length; return "border"+(Math.floor(i/BGENES.length)+1)+"."+BGENES[i%BGENES.length][0];
+  i-=TGENES.length; if(i<LGENES.length) return "lat."+LGENES[i][0];
+  i-=LGENES.length; return "border"+(Math.floor(i/BGENES.length)+1)+"."+BGENES[i%BGENES.length][0];
 }
 function applyVec(p,v){
   let i=0;
@@ -1886,6 +2821,8 @@ function applyVec(p,v){
   if(!p.tile) p.tile={motif:"ein",dup:1,gap:1,stagger:3};
   for(const [k,lo,hi,int] of TGENES){ let x=lo+clamp(v[i++],0,1)*(hi-lo); if(int) x=Math.round(x); p.tile[k]=x; }
   p.tile.dup=Math.max(1,p.tile.dup|0);
+  if(!p.lat) p.lat={figure:"none",mode:"mirror",density:4,scale:2,stagger:0,gapX:1,gapY:1};
+  for(const [k,lo,hi,int] of LGENES){ let x=lo+clamp(v[i++],0,1)*(hi-lo); if(int) x=Math.round(x); p.lat[k]=x; }
   for(let bi=0;bi<MAXB;bi++) for(const [k,lo,hi,int] of BGENES){
     let x=lo+clamp(v[i++],0,1)*(hi-lo); if(int) x=Math.round(x); if(bi<p.borders.length) p.borders[bi][k]=x; }
   p.maxDepth=Math.min(p.maxDepth,p.height);
@@ -1933,6 +2870,7 @@ function computeAxes(){
   document.getElementById("evAxX").innerHTML="→ <b>"+label(EV.axes[0])+"</b>";
   document.getElementById("evAxY").innerHTML="↓ <b>"+label(EV.axes[1])+"</b> &nbsp;·&nbsp; axes from "+EV.axesFrom;
 }
+const pickOne=(a,rng)=>a[Math.floor(rng()*a.length)];
 function gauss(rng){ let u=0,v=0; while(u===0)u=rng(); while(v===0)v=rng(); return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v); }
 function mutant(i,j){
   const Gn=EV.G, c=(Gn-1)/2, S=EV.S;
@@ -1948,7 +2886,8 @@ function mutant(i,j){
   const pMotif=S*0.35*ring, pGlyph=S*0.35*ring, pBands=S*0.22*ring;
   for(const b of parent.borders) if(rng()<pMotif) b.motif=LEX_KEYS[Math.floor(rng()*LEX_KEYS.length)];
   if(rng()<pMotif) parent.tile.motif=LEX_KEYS[Math.floor(rng()*LEX_KEYS.length)];
-  if(rng()<S*0.08*ring) parent.layout = parent.layout==="tile" ? "sadu" : "tile";
+  if(rng()<pMotif) parent.lat.figure = pickOne(LEX_KEYS.filter(k=>k!=="ground"&&k!=="stripe").concat(GLYPH_KEYS.map(k=>"glyph:"+k)), rng);
+  if(rng()<S*0.08*ring) parent.layout = pickOne(["tile","lattice","sadu"].filter(l=>l!==parent.layout), rng);
   const gl=parent.centre.glyphs;
   for(let k=0;k<gl.length;k++) if(rng()<pGlyph) gl[k]=GLYPH_KEYS[Math.floor(rng()*GLYPH_KEYS.length)];
   if(rng()<pGlyph*0.6){ if(gl.length>1 && rng()<0.5) gl.splice(Math.floor(rng()*gl.length),1); else if(gl.length<6) gl.splice(Math.floor(rng()*(gl.length+1)),0,GLYPH_KEYS[Math.floor(rng()*GLYPH_KEYS.length)]); }
@@ -1965,7 +2904,13 @@ function mutant(i,j){
   if(rng()<S*0.08*ring) parent.centre.fit=!parent.centre.fit;
   if(rng()<S*0.10*ring) parent.weftSpan = parent.weftSpan==="wall" ? "band" : "wall";
   if(rng()<S*0.05*ring) parent.grid = !parent.grid;
-  parent.seed=(rng()*1e9)|0;
+  if(rng()<S*0.06*ring) parent.diagonal = !parent.diagonal;
+  if(rng()<S*0.06*ring) parent.latPattern = !parent.latPattern;
+  if(rng()<S*0.08*ring) parent.patMoves = pickOne(["diag","diagV","diagH","all"],rng);
+
+  if(parent.layout==="lattice" && parent.latPattern && rng()<S*0.1*ring) parent.tile.motif = pickOne(LLEX_KEYS,rng);
+  if(parent.layout==="lattice" && rng()<S*0.08*ring) parent.latCell = clamp((parent.latCell||1)+(rng()<0.5?-1:1),1,3);
+  parent.seed=(rng()*1e9)|0; parent.bulbSeed=parent.seed;
   return applyVec(parent, vecOf(parent));
 }
 let gridTimer=null;
@@ -2043,7 +2988,6 @@ function setMode(m){
   document.getElementById("view").style.visibility=ev?"hidden":"visible";
   document.getElementById("hud").style.display=ev?"none":"";
   ["viewSeg","btnPolarity"].forEach(id=>document.getElementById(id).style.display=ev?"none":"");
-  document.getElementById("blur").parentElement.style.display=ev?"none":"";
   document.getElementById("gain").parentElement.style.display=ev?"none":"";
   if(ev){
     const f=FAVS.find(g=>g.id===currentFavId);
@@ -2082,13 +3026,13 @@ function dl(name,text,mime){
 const stamp=()=>`sadu_${D.P.seed}`;
 const bandLabel=nd=> nd.band.isCentre?"centre":nd.band.name+(nd.band.mirror?"'":"");
 document.getElementById("exCables").onclick=()=>{
-  const L=["cable_id,anchor_index,anchor_x_mm,strand_id,band,path_points,turns,weft_floats,horizontal_mm,shed_row,shed_y_mm,tail_mm,bulb_x_mm,bulb_y_mm,path_len_mm,cut_len_mm,mass_g,waypoints_x_mm"];
+  const L=["cable_id,anchor_index,anchor_x_mm,strand_id,band,path_points,turns,weft_floats,horizontal_mm,shed_row,shed_y_mm,drop_run_mm,tail_mm,bulb_x_mm,bulb_y_mm,path_len_mm,cut_len_mm,mass_g,waypoints_x_mm"];
   const nodeBand={}; for(const nd of D.nodes) nodeBand[nd.id]=bandLabel(nd);
   for(const c of D.cab){
     const wp=[]; for(let i=0;i<c.pts.length;i+=2) wp.push(Math.round(c.pts[i]*1000));
     const mass=c.len*D.P.gpm + D.P.bulbMass;
     L.push([c.id,c.id,Math.round(c.anchorX*1000),c.node,nodeBand[c.node]||"",c.pts.length/2,c.turns,c.floats,Math.round(c.hlen*1000),c.shedRow,
-            Math.round(c.shedRow*D.dy*1000),Math.round(c.tail*1000),
+            Math.round(c.shedRow*D.dy*1000),Math.round((c.drop||0)*1000),Math.round(c.tail*1000),
             Math.round(c.bx*1000),Math.round(c.by*1000),
             Math.round((c.len-c.tail)*1000),Math.round(c.len*1000),
             Math.round(mass),'"'+wp.join(" ")+'"'].join(","));
@@ -2201,7 +3145,7 @@ document.getElementById("exPng").onclick=()=>{
 };
 
 /* ═══════════════════════ BOOT ═══════════════════════ */
-applyParams(PRESETS["Eye lattice"]); presetSel.value="Eye lattice"; setFamily("Eye lattice");
+const FIRST=Object.keys(PRESETS)[0]; applyParams(PRESETS[FIRST]); presetSel.value=FIRST; setFamily(FIRST);   // the newest preset boots first
 syncInputs(); buildBorders(); regen(true); renderFavs();
 setTimeout(()=>{draw();drawCharts();},60);
 </script>

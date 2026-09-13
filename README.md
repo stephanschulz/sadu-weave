@@ -1,6 +1,6 @@
 # Al Sadu Cable Weave — loom model
 
-Live: **https://stephanschulz.ca/sadu-weave/**
+Live: **https://stephanschulz.ca/sadu-weave/** · lattice editor: **https://stephanschulz.ca/sadu-weave/lattice-editor.html**
 
 Or open **`sadu-weave.html`** in a browser (double-click it). No server, no build, no
 dependencies. Use `file://` — the exports are real file downloads.
@@ -93,7 +93,272 @@ keeps a fixed slot inside its bundle for life (so it never drifts sideways as
 neighbours shed or hop), and horizontals lie on the row line (`lane offset` 0;
 raise it only if you want rightward and leftward runs drawn apart). The **grid**
 toggle in the top bar (or `g`) draws the lines the cables follow — column centres
-and row lines, every tenth stronger, with a metre scale.
+and row lines, every tenth stronger, with a metre scale. The Technical view draws
+strand centrelines the same way the cables are built — down, then along the row
+line — plus structural columns (orange rails), floats (teal), crossings, corners
+held by ribs (hollow squares) and any unsupported corner (red ✕).
+
+## Diagonals
+
+*diagonal moves* builds a strand's column change as a straight cable between the
+two tie nodes instead of down-then-along-the-row — physically just a cable
+between two ties; the support rule applies at the nodes exactly as before. The
+angle is set by the grid: one cell per row on the square 100 mm grid is **45°**.
+30° and 60° need a 1 : √3 ratio the square grid cannot make, so *row pitch* can
+differ from the column pitch: **173 mm rows** with one cell per row are exactly
+**30°** from vertical; **115 mm rows** with two cells per row (the `zigzag — 2
+cells per row` motif) are **60°**. Presets *Diagonals 45° / 30° / 60°* are the
+zigzag tile with those settings; measured, every diagonal segment sits at the
+named angle (the 60° preset has a few single-cell 41° steps where the support
+rule shortened a two-cell move). Randomise-within keeps the angle.
+
+## Diagonal lattice — every cable on an angle
+
+*composition* = **diagonal lattice** makes every cable a straight diagonal. From
+each start column (*start every* cells) two strands leave the beam, one at +θ and
+one at −θ, each with half the cables; they cross the other family at every node
+(a tied crossing) and bounce off the edge rails. No ribs and no anchor columns:
+at every crossing the two families' sideways pulls cancel, so the net holds
+itself like a hanging fishnet — the rails only take the bounces (the panel
+reports the count and the worst pull on a rail tie). θ comes from the grid as
+above: 45° square, 30° with 173 mm rows, 60° with 115 mm rows and two cells per
+row (which needs *start every 1*, or half the columns are never visited).
+Presets *Lattice 45° / 30° / 60°*. Bulbs hang from nodes; drift is
+off (there is no rib to run along). Measured on the 45°: 33,078 diagonal
+segments, all at 45°, zero horizontals, 99 tied crossings per cable, 311 kg.
+
+### Lattice angle
+
+Every lattice design listens to one **lattice angle** slider (under the Randomise buttons, 15–75° from
+vertical). The row pitch is derived from it — row = cells/row × column pitch ÷
+tan θ — so 45° is the square 100 mm grid, 30° gives 173 mm rows, 60° gives 58 mm
+rows (or 115 mm with *2 cells/row*). Measured: every diagonal segment sits at
+the set angle. Randomise-within keeps the angle; the full-range draw varies it.
+
+### Pattern strands on a base lattice — the way that works
+
+*pattern strands travel along the lattice* splits the cables in two roles. A
+**base lattice** takes `base share` of them: two thin strands from every base
+start column (`start every`, 2 on the presets → 70 base strands), straight ±θ,
+every crossing zip-tied or knotted, stretched between the rails with `net
+pretension` (200 N on the presets). The rest form **pattern bundles**, two per
+base start column, one each way (70 on the presets, ~11 cables each — about the
+tile layout's strand), that move node to node along the lattice edges — exactly
+±1 cell per row. Every cable is still a straight diagonal between ties.
+
+**The turned tile — what can and cannot hang.** The wanted look is the tile
+design turned by 45°: its columns become one lattice direction, its ribs the
+other, its brick-like rectangles sit on the diagonals. A literal turn of the
+tile's *cable paths* cannot be built: the tile's along-the-rib moves go both
+ways, and after the turn one of the two runs uphill (tested — the one-way
+version collapses, every bundle drifts to its band's edge and the chart is
+lost; it is kept as the *tile rule turned literally* frame for comparison).
+Turned as an *image* it is fine: a rectangle whose sides lie on the lattice has
+all four sides downward-traversable — top corner to the two side corners to the
+bottom corner — so two bundles draw it, parting at the top and meeting at the
+bottom. That is what the lattice does.
+
+**Off-grid interconnects (the turned tile).** With *chart frame = the tile
+turned*, the tile's own chart and pickup run in the lattice frame and every
+tile move "down one row, along k cells" becomes **one straight cable between
+two nodes** — an off-grid interconnect: along one way the segment to node
+(c + s(1−k), r + 1 + k) (k = 1 a vertical, k = 2 a steep line), along the other
+way the horizontal hop along the rib line (`pattern moves` must allow it).
+*along-moves = chevron* draws the same move on the lattice instead (down one
+step, then k along the other direction) — that is the picture of the
+screenshot rotated by hand, since the tile's horizontals become the other
+diagonal. Every segment is tied at both ends and starts with the node
+stiffness test. Bundles on the chart's ground columns run straight — the
+tile's anchor columns turned. Presets *Lattice + eyes / zigzag / diamonds /
+pebbles* use the turned tile with the tile motifs; *bricks* and *cells* use
+edge following on lattice-frame charts. `turned_interconnects.png` in this
+folder compares the variants against the rotated screenshot.
+
+**Flow — the lattice carries the pattern (the current model).** Stephan's
+concept: build the thin lattice, then run many cables along its lines to
+thicken the lines the design wants, evenly, thinning toward the floor as the
+cables shed. *flow* does exactly that: every cable rides the lattice lines;
+at every crossing the two lines pool their cables and part again — the
+segment below that the chart marks dark takes the share (weight 1), the light
+one keeps a single lattice cable (weight 0.05), with a look-ahead Φ (dark
+nodes reachable below, discounted 0.6 per row) so cables are routed toward a
+figure before they reach it. Shedding prefers light segments and never takes
+a line's last cable above `base ends below`. Every cable path is a lattice
+path (monotone, tied at every crossing), every segment's thickness is its
+cable count, the wall is homogeneous left to right, and the picture is
+independent of the bulb seed. The share a carrier-only segment takes is `light share` (0.04 on the
+presets — a few cables, so the thin lines stay thin); the look-ahead only
+tips the balance between two like segments. Flow needs an **even** start
+pitch (2 = 20 cm, 4 = 40 cm): with an odd pitch the two families cross
+between rows, not at nodes. Figures read best when the chart cell is a whole
+lattice diamond and the mesh is coarse — the presets use the 40 cm mesh, so an
+eye is a 1.2 m diamond outline of thick cable on a thin net. Presets *Flow ·
+eyes / big eyes / bricks / cells / diamonds / pebbles / eye (tile chart)*; `flow_zoom.png` and
+`flow_presets.png` show them against the rotated screenshot. Rail bounces are
+part of the lattice, so the figures shift phase at the rails.
+
+**Carrier = verticals + one diagonal family (V+D).** *carrier* in the lattice
+box switches from the ±θ diamond net to verticals plus diagonals running one
+way (down-right). Nothing reflects: a diagonal that reaches the right rail
+hands its cables to the right-rail vertical (which sheds them fast), and
+diagonals also enter from the left rail, fed by a left-rail vertical that
+starts with `rail share` of the cables (30 % on the preset). The chart frame is
+(vertical index, diagonal index), so the tile's Cross net — bold verticals
+with rungs — becomes *Flow · cross net V+D*: bold verticals with the rungs
+running along the diagonals. Inherent to one-way diagonals on a top-hung
+wall: the lower-left is only as rich as the left rail's share, and the right
+edge collects what the diagonals bring.
+
+**Drawn designs in the weave app.** *load drawn design* (lattice box) takes
+the editor's JSON or SVG. The painted segments become the flow chart at
+segment level: a lattice segment is dark if it is a painted segment translated
+by whole multiples of the two repeat vectors. The repeat is read from the
+drawing itself: draw one motif several times in different colours, and the
+two shortest independent offsets between the colour copies are the repeat
+(one colour = repeat by the motif's own width). Segments are kept in lattice
+units — i = x ÷ (pitch/2), j = y ÷ one row — so a drawing made on a 20 cm
+45° sheet maps onto the app's 20 cm 45° carrier (the ±θ carrier is shifted by
+one column so node parities coincide). On V+D the node-to-node step is a whole
+pitch, on ±θ half a pitch. `drawn_charts.png` shows the derived chart beside
+each drawing, `drawn_designs.png` the flow result. Presets *Drawn · V+D eye
+chain (1914)* and *Drawn · ±45 eye chain (1906)* embed the two drawings of
+2026-09-12 (`saved lattice manual designs/`).
+
+**Where the cables go when a drawn figure ends — sinks.** Measured on the
+1906 chain: the node splits are right (4 % misrouted), but a closed shape has a
+bottom vertex where a cable cannot stop, and the top beam hangs all 1000 cables
+whether a line starts into a figure or into a gap. So three rules now apply to
+drawn designs: cables are **anchored by the design** (a top start gets its
+share by what its first segment runs into — painted ≈ full, plain ≈ the light
+share); a bundle at a **sink** (plain segment ahead, no painted way down at
+the node) sheds to bulbs first, within the row's bulb budget (`shed at sinks`,
+`sink budget ×` — above 1 the wall empties early, so 1 is the default); and
+what the budget cannot take runs the plain lattice to the next figure, steered
+by the look-ahead. Result on the two drawings: 20–30 % of the cables are on
+plain lines through the middle of the wall (≈5 cables a line against ≈15 on
+the figures), more near the beam. That residue is physics, not a bug: a design
+whose figures connect downward (each element's bottom running into the next)
+keeps its cables and reads far cleaner than one made of closed diamonds. Sub-
+segments from the editor's anchor subdivision merge into their node-to-node
+segment; it counts as painted when at least half of it is. Free lines that are
+exactly one lattice step join the chart; off-grid free lines are counted in
+the readout but not used by the flow yet (the flow routes along lattice
+lines only).
+
+**Route model — a cable per design path, or cables chained through
+several designs.** *drawn design → cables* in the lattice box. The tiled motif
+is cut into **paths**: monotone runs of painted segments (a closed diamond is
+two paths; the 1906 drawing gives 133 copies and 860 paths on the wall). Then:
+*one* — one cable per path (round-robin if there are more cables), brought
+from the beam by the cheapest monotone lattice route (plain segments cost 1,
+another copy's segments 4, routes already used more — connectors stay thin and
+spread); the bulb hangs where the path ends. *chain* — every cable gets an end
+row from the bulb schedule (so bulbs stay evenly spread by height, longest
+cables first), runs beam → path → the nearest next path below it has length
+for → … and spends what is left straight down the plain lattice; passes repeat
+while cables remain, so paths get several cables (≈7 per cable on the 1906
+drawing) and read bolder. *equal* — every cable the same length: on a ±45°
+lattice every segment descends the same, so all cables end at depth 0.71 · L
+and the bulbs form one line; kept to show why. Route modes need the ±θ carrier
+at start every 2 and a drawn design; `route_modes.png` compares them. This is
+the model that draws a hand-drawn design faithfully: the carrier stays a
+single cable, the design lines are the routed cables, thickness is how many
+cables trace a path.
+
+**Lattice editor (`lattice-editor.html`).** A second, small app for drawing a
+design by hand on the carrier lattice: pick the carrier (±θ diamonds, verticals
++ one diagonal, verticals + both diagonals), angle, pitch and wall size; the
+lattice is built the way the sheets are (every line from the top or a rail,
+reflecting where it should, angle snapped so the floor is a node row). Click
+or drag over segments to colour them (six colours + eraser; shift-click paints
+a whole line; `z` undoes), set the design stroke width, split each vertical or
+diagonal cell into several paintable pieces (*anchors per cell* — extra tie
+points between two crossings, each shown as a dot), draw **free lines** from
+any anchor dot to any other (click a dot, click another; a straight cable
+between two tie points, on or off the lattice; a second line between the same
+two anchors sits beside the first; clicking a line with its own colour deletes
+it, another colour recolours it), and save an **SVG**
+(centimetre units, carrier as thin lines, painted segments as drawn, the
+design data embedded in `<metadata>`) or a **JSON** (segment ids + end points
+in metres) that reloads, and that the weave app can take as a chart later.
+Work is autosaved in the browser; downloads need the page opened from
+file://.
+
+**Free interconnects — the lattice as structure only.** With *free
+interconnects* on, the pattern has its own grid (`pattern cell`, 2 steps = 20
+cm on the presets) and its bundles tie wherever they cross a lattice cable or
+another bundle; the lattice is structure only and can be coarse (`start every`
+4 = a 40 cm mesh of single cables, 4 % of the cables). The turned tile then
+runs at the tile's own weight — 70 bundles of ~14 cables, a bundle on every
+pattern column — and a move is one straight segment across a whole cell:
+"down a cell, along k" is the vertical (k = 1) or the steep line (k = 2), the
+other way the horizontal hop of one cell. The node-stiffness test is skipped
+for free bundles (they are tied to what they cross, not to a node). This is
+the model for **"a repetitive pattern, homogeneous across the whole surface"**
+on the diagonal: both bundle families draw the same chart, so the turned tile
+and its mirror overlay everywhere and the wall reads the same left to right;
+the bounce lines off the rails remain visible as a V.
+`turned_free_interconnects.png` compares eyes / zigzag / pebbles / diamonds
+this way against the rotated screenshot.
+
+**Lattice-frame motifs.** The chart's columns run along one lattice direction
+and its rows along the other (node (c,r) is chart cell ((r−c)/2, (c+r)/2) ÷
+`chart cell`): *eye* is a square outline in the chart and a diamond outline on
+the wall, *bricks* / *long bricks* / *cells* are rectangles in running bond
+(gap 0 + stagger — the turned cross net), *diamond* a solid block, *cross* a
+plus (an X on the wall), *zigzag* a staircase, *pebbles* a checker, plus
+*nested eyes*, *lines*, *ladder*. At 30° the figures are tall, at 60° flat —
+they stretch with the lattice. A tile motif picked here appears turned by 45°.
+
+**Routing — edge following with the tile pickup.** Two bundles leave every
+base start column, one each way (70 bundles, ~11 cables — the tile's strand).
+A bundle runs straight while the node ahead is dark; where only the node across
+is dark it turns; at a vertex (both dark) it turns with `turn share` (1 hugs
+every side and reads as zigzags, 0 keeps long runs), otherwise the tile pickup
+decides — j-th bundle of the motif tile → j-th dark node — so bundles that met
+on a node part again below it instead of merging for good (measured: median
+bundle stays 11 cables; a greedy nearest-dark rule merged them into 140-cable
+bundles that no node could turn). Turns are still refused where the node has
+no base under it — below `base ends below`, and for heavy bundles on a thin
+base — so the presets keep the base at 7 % (single cables, so the mesh does not
+out-draw the figures) and ~30 % of attempted turns are refused, nearly all in
+the lower wall.
+
+**Figures with a backing lattice.** The figure modes act on the pattern layer
+only: *holes* reflect the pattern bundles while a single-cable base net
+(`base share` 8 %) runs straight through the hole, so the hole edges are
+supported and the void reads. Presets *Lattice · diamond / eye / cross holes*,
+*steps (density)*; pattern presets *Lattice + eyes / zigzag / bricks / cells /
+diamonds / pebbles* (lattice-frame motifs, 1 step per chart cell, base 7 %).
+A heavy bundle whose turn is refused at a hole edge crosses the hole (reported
+as *strands forced through a hole*).
+
+### Figures on the lattice — what the physics allows
+
+A figure on a uniform diagonal net needs strands to deviate at its boundary,
+and every deviation is a bounce that pulls its node sideways unless a mirror
+bounce of the other family happens at the same node. Three modes, all measured:
+
+- **holes** — the net reflects off the figure like off the rails. Legible (the
+  figure is a real void with lines piling along its edge), but every hole edge
+  is pulled open: on the eyes preset 138 uncancelled turn nodes, worst 168 N;
+  low on the wall, where strands are light, a node would shift ≈ 300 mm. Fine
+  near the beam, not in the lower half. The panel shows these numbers.
+- **density** — the net stays perfect; inside the figure cables drop to bulbs
+  earlier (× factor). No load at all, but weak: a strand's line weight can only
+  decrease along its diagonal, so the figure smears downstream and reads as a
+  tone shift and a bulb-density shift (37 % of bulbs in 29 % of the wall at ×4).
+- **chevrons** — inside the figure every node is a mirror: both families flip
+  there, so pulls cancel, and strands zigzag in place until the figure ends.
+  Balanced — and invisible: a zigzag between two columns traces exactly the
+  diamond edges the crossing families already draw. Tested on the coarser
+  *start every 2* mesh too: still nothing shows.
+
+(The pure-lattice figure modes without a base remain selectable; the presets
+above all use a backing lattice.) The honest summary: on an all-diagonal net, legible
+figures cost edge loads; balanced figures are faint or invisible. If the
+pattern must be both legible and unloaded, it belongs in the tile layout (ribs
+and anchor columns) or in the bulbs.
 
 ## Layout — tile or strip
 
@@ -171,6 +436,19 @@ forever.
   chooses which strand sheds at each row so bulbs don't comb into stripes.
 - **No stretch** (nylon core) ⇒ cut length = path + tail, exactly.
 
+## Bulb layout — independent of the weave
+
+**⚄ new bulb layout** re-draws where the bulbs are without touching the weave.
+The design seed fixes how many cables leave each strand at each row and which
+floats happen (the plan); the bulb seed re-decides *which* cables drop, their
+tail lengths, and their **drift**: with that probability a dropping cable first
+runs along the rib (a tensioned horizontal, so it can be tied anywhere along it)
+up to *drift reach* cells and hangs from that point — so bulbs stop lining up
+under their strands and under the grid columns. Verified: strand paths, ribs and
+corners are byte-identical across bulb seeds; only cable lengths change (a drop
+run is in `cables.csv` as `drop_run_mm`). Bulb x-evenness improves from CV 0.26
+(no drift) to ≈ 0.20.
+
 ## Reading the right-hand panel
 
 | Readout | What it means |
@@ -235,4 +513,4 @@ part.
 | `elevation.svg` / `.dxf` | 1:1 in millimetres |
 | `design.json` | parameters + summary — reproduce exactly |
 
-Keyboard: `r` new seed · `s` save favourite · `p` polarity · `g` grid · `1`–`4` views.
+Keyboard: `r` new seed · `s` save favourite · `p` polarity · `g` grid · `1`–`3` views (Weave · Bulbs · Technical).
